@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: forever-pod-
+spec:
+  entrypoint: stay-alive
+  templates:
+  - name: stay-alive
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      # A simple infinite loop in shell
+      args: ["while true; do echo 'Still here...'; sleep 60; done"]

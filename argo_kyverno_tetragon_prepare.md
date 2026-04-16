@@ -32,3 +32,5 @@ kubectl get pods -n kyverno
 helm install tetragon ${EXTRA_HELM_FLAGS[@]} cilium/tetragon -n kube-system
 
 kubectl rollout status -n kube-system ds/tetragon -w
+
+kubectl port-forward -n kube-system ds/tetragon 54321:54321
