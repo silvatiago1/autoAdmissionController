@@ -5,6 +5,7 @@ helm install argo-workflows argo/argo-workflows \
   --namespace argo \
   --version 0.45.21 \
   --set server.serviceType=ClusterIP
+  
 
 ## Check status
 kubectl get pods -n argo
@@ -28,8 +29,10 @@ helm install kyverno kyverno/kyverno \
 
 kubectl get pods -n kyverno
 
-# Tetragon
-helm install tetragon ${EXTRA_HELM_FLAGS[@]} cilium/tetragon -n kube-system
+# Tetragon //This setup works with kprobe, but not with lsm hooks
+helm install tetragon cilium/tetragon -n kube-system \
+  --set tetragon.hostNetwork=true \
+  --set tetragon.securityContext.privileged=true
 
 kubectl rollout status -n kube-system ds/tetragon -w
 
