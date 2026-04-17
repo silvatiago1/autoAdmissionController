@@ -1,4 +1,4 @@
-apiVersion: cilium.io/v1alpha1
+apiVersion: cilium.io/v1alpha1 # Code from tetragon docs
 kind: TracingPolicy
 metadata:
   name: "fd-install"
