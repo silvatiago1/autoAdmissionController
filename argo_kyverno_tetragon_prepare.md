@@ -4,21 +4,22 @@ kubectl create namespace argo
 helm install argo-workflows argo/argo-workflows \
   --namespace argo \
   --version 0.45.21 \
-  --set server.serviceType=ClusterIP
+  --set server.serviceType=ClusterIP \
+  --set server.authModes={}
   
 
 ## Check status
 kubectl get pods -n argo
 
-## Enable UI
-kubectl port-forward svc/argo-workflows-server -n argo 2746:2746
-
 ## RBAC (This is overly permissive, only used for test porpuses)
-
 kubectl create rolebinding default-admin \
   --clusterrole=admin \
   --serviceaccount=argo:default \
   -n argo
+
+## Enable UI
+kubectl port-forward svc/argo-workflows-server -n argo 2746:2746
+
 
 # Kyverno
 kubectl create namespace kyverno
