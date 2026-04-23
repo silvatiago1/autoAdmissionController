@@ -37,3 +37,11 @@ helm install tetragon cilium/tetragon -n kube-system \
 kubectl rollout status -n kube-system ds/tetragon -w
 
 kubectl port-forward -n kube-system ds/tetragon 54321:54321
+
+# Falco
+helm install --replace falco --namespace falco --create-namespace --set tty=true falcosecurity/falco
+
+kubectl wait pods --for=condition=Ready --all -n falco
+
+## Disable default rules
+helm upgrade --namespace falco falco falcosecurity/falco --set tty=true -f disable_rules.yaml
