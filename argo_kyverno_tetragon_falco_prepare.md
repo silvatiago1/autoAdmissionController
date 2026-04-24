@@ -43,5 +43,5 @@ helm install --replace falco --namespace falco --create-namespace --set tty=true
 
 kubectl wait pods --for=condition=Ready --all -n falco
 
-## Disable default rules
-helm upgrade --namespace falco falco falcosecurity/falco --set tty=true -f disable_rules.yaml
+## Disable default rules and apply created rules
+helm upgrade --namespace falco falco falcosecurity/falco --set tty=true -f disable_rules.yaml -f detect_unwanted.yaml
