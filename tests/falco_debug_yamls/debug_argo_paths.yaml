@@ -3,5 +3,5 @@ customRules:
     - rule: debug_argo_file_ops
       desc: Log file paths seen in argo
       condition: k8s.ns.name = "argo" and evt.type in (open, openat, openat2, creat, mkdir, mkdirat, unlink, unlinkat, rmdir, rename, renameat, renameat2, link, linkat, symlink, symlinkat)
-      output: "evt=%evt.type path=%fs.path.name rawname=%fs.path.nameraw source=%fs.path.source target=%fs.path.target proc=%proc.cmdline container=%container.id"
+      output: "evt=%evt.type path=%fs.path.name rawname=%fs.path.nameraw source=%fs.path.source target=%fs.path.target proc=%proc.cmdline container=%container.id evt_arg_flags=%evt.arg.flags"
       priority: INFO
