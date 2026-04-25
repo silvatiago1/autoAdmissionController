@@ -1,7 +1,7 @@
 customRules:
   detect_write_to_target.yaml: |
     - macro: work_tmp_dir
-      condition: fs.path.name contains "/work/tmp" or fs.path.name contains "/mainctrfs/work/tmp"
+      condition: fd.is_upper_layer=true and (fs.path.name contains "/work/tmp" or fs.path.name contains "/mainctrfs/work/tmp")
 
     - rule: something_work
       desc: something happened below /work
