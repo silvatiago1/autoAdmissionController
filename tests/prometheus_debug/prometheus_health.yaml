@@ -1,0 +1,1 @@
+#container_memory_working_set_bytes{namespace="argo", pod="forever-pod-5hfgd"}  # Amount of memory, in bytes, being used by the pod
