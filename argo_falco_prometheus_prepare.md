@@ -32,8 +32,7 @@ kubectl wait pods --for=condition=Ready --all -n falco
 kubectl logs -f --tail=50 -l app.kubernetes.io/name=falco -n falco -c falco
 
 
-# Prometheus and Alertmanager (the command below also installs some stuff besides Prometheus and Alertmanager)
+# Prometheus-stack
 helm install monitoring prometheus-community/kube-prometheus-stack
 
 kubectl port-forward svc/monitoring-kube-prometheus-prometheus 9090
-kubectl port-forward svc/monitoring-kube-prometheus-alertmanager 9093
