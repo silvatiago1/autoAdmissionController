@@ -1,5 +1,6 @@
 import yaml
-from typing import Tuple
+from typing import Tuple, Any, Dict, List
+from copy import deepcopy
 
 def get_argo_resource_name(manifest: yaml) -> Tuple[str, str]:
     """
@@ -28,4 +29,22 @@ def get_argo_resource_name(manifest: yaml) -> Tuple[str, str]:
 
     else:
         raise ValueError(f"Unsupported kind: {kind}")
-    
+
+
+def separate_argo_templates(workflow: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Receives a  Workflow/WorkflowTemplate and returns each item in spec.templates
+    as an independent template dict.
+    """
+    kind = workflow.get("kind")
+
+    if kind != "WorkflowTemplate" and kind != "Workflow":
+        raise ValueError("Expected kind: Workflow or WorkflowTemplate")
+
+    spec = workflow.get("spec", {})
+    templates = spec.get("templates", [])
+
+    if not isinstance(templates, list):
+        raise ValueError("spec.templates must be a list")
+
+    return [deepcopy(template) for template in templates]
