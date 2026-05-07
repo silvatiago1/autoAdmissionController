@@ -1,0 +1,12 @@
+events:
+  op: and
+  items:
+    - openat
+
+flags:
+  op: and
+  items:
+    - O_CREAT
+    - O_CLOEXEC
+    - O_RDWR
+    - O_F_CREATED

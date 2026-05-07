@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from pathlib import PurePosixPath
-from typing import Any, Dict, List, Set
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, Set
 from dataclasses import dataclass, field
 from textwrap import dedent
 import yaml
 
 
 @dataclass
-class BinaryInfo:
-    flags: Set[str] = field(default_factory=set)
-    events: Set[str] = field(default_factory=set)
+class ConditionGroup:
+    op: str = "and"  # "and" or "or"
+    items: Set[str] = field(default_factory=set)
 
+@dataclass
+class BinaryInfo:
+    flags: ConditionGroup = field(default_factory=ConditionGroup)
+    events: ConditionGroup = field(default_factory=ConditionGroup)
 
 binaries: Dict[str, BinaryInfo] = {}
 
@@ -27,43 +31,93 @@ def _literal_str_representer(dumper: yaml.Dumper, data: LiteralStr):
 yaml.add_representer(LiteralStr, _literal_str_representer, Dumper=yaml.SafeDumper)
 
 
+def _build_group(prefix: str, group: ConditionGroup) -> str:
+    if not group.items:
+        return ""
+
+    exprs = [f"{prefix}{item}" for item in sorted(group.items)]
+    joined = f" {group.op} ".join(exprs)
+    return joined if len(exprs) == 1 else f"({joined})"
+
+
 def build_binary_condition(binary: str, info: BinaryInfo) -> str:
     parts = [f"proc.name = {binary}"]
 
-    if info.events:
-        event_part = " or ".join(f"evt.type={event}" for event in sorted(info.events))
-        parts.append(event_part if len(info.events) == 1 else f"({event_part})")
+    event_part = _build_group("evt.type=", info.events)
+    if event_part:
+        parts.append(event_part)
 
-    if info.flags:
-        flag_part = " and ".join(
-            f"evt.arg.flags contains {flag}" for flag in sorted(info.flags)
-        )
-        parts.append(flag_part if len(info.flags) == 1 else f"({flag_part})")
+    flag_part = _build_group("evt.arg.flags contains ", info.flags)
+    if flag_part:
+        parts.append(flag_part)
 
     return " and ".join(parts)
 
+def load_binary_specs(spec_dir: str | Path) -> Dict[str, BinaryInfo]:
+    spec_dir = Path(spec_dir)
+    loaded: Dict[str, BinaryInfo] = {}
+
+    for spec_file in sorted(spec_dir.iterdir()):
+        if not spec_file.is_file():
+            continue
+
+        data = yaml.safe_load(spec_file.read_text()) or {}
+        if not isinstance(data, dict):
+            raise ValueError(f"{spec_file} must contain a YAML mapping")
+
+        info = BinaryInfo()
+
+        for section_name, group in (("events", info.events), ("flags", info.flags)):
+            section = data.get(section_name, {})
+            if section is None:
+                continue
+
+            if isinstance(section, dict):
+                group.op = section.get("op", "and")
+                items = section.get("items", [])
+            else:
+                items = section
+
+            if group.op not in {"and", "or"}:
+                raise ValueError(f"{spec_file}: {section_name}.op must be 'and' or 'or'")
+
+            if not isinstance(items, list):
+                raise ValueError(f"{spec_file}: {section_name}.items must be a list")
+
+            group.items.update(str(item) for item in items)
+
+        loaded[spec_file.name] = info
+
+    return loaded
+
+def format_condition(expr: str) -> str:
+    lines = expr.split(" and ")
+    if not lines:
+        return ""
+
+    # Every line starts 8 spaces under the "condition: >" line
+    return " and\n        ".join(lines)
 
 def build_inputs_rule(
     inputs: Dict[str, Any],
     namespace: str = "argo",
     rule_filename: str = "detect_write_to_etc.yaml",
+    spec_dir: str | Path = "binary_specs",
 ) -> Dict[str, Any]:
     """
     Receives the inputs section of an Argo template, maps the file type being extracted
-    to the events, commands, and Flags that Argo uses to handle them, and creates a rule
-    stating that if those are used to in a path not equal to the one defined for extraction,
-    then a warning must be raised. #TODO:I am creating a customRule for now, for test porpuses, but in certain cases the same bins may be used for other things, so it will have to be a map used to then create a rule (in another function)
-
-    Returns:
-    - A Falco customRule
+    to the events, commands, and flags that Argo uses to handle them, and creates a rule.
     """
-    artifacts = inputs.get("artifacts", [])  # TODO: Assuming, for now, that artifacts is present
+    artifacts = inputs.get("artifacts", [])
     if not isinstance(artifacts, list):
         raise ValueError("inputs.artifacts must be a list")
 
     extract_paths: Set[str] = set()
-    binaries.clear()
-    binaries["argoexec"] = BinaryInfo()
+    used_binaries: Set[str] = set()
+
+    archive_to_binary = {
+        "tar": {"argoexec"},
+    }
 
     for artifact in artifacts:
         if not isinstance(artifact, dict):
@@ -75,29 +129,28 @@ def build_inputs_rule(
         if path and isinstance(path, str):
             extract_paths.add(path)
 
-        # Detect archive type(s). Extend this map as needed.
         if isinstance(archive, dict):
-            if "tar" in archive:
-                # In Argo Workflows, tar extraction is commonly handled by argoexec
-                binaries["argoexec"].events.add("openat")
-
-                binaries["argoexec"].flags.update([
-                    "O_CREAT",
-                    "O_CLOEXEC",
-                    "O_RDWR",
-                    "O_F_CREATED",
-                ])  # TODO: Put these in a file with this info, instead of it all being here
-            # TODO: Add more types of files
+            for archive_type, binaries_for_type in archive_to_binary.items():
+                if archive_type in archive:
+                    used_binaries.update(binaries_for_type)
 
     if not extract_paths:
         raise ValueError("No artifact paths found in inputs.artifacts")
 
-    if not binaries:
+    if not used_binaries:
         raise ValueError("No supported archive extraction binaries detected")
 
-    # Build OR conditions safely.
-    binary_condition = next(
-        build_binary_condition(binary, info)
+    all_binaries = load_binary_specs(spec_dir)
+    binaries.clear()
+    binaries.update(
+        {name: info for name, info in all_binaries.items() if name in used_binaries}
+    )
+
+    if not binaries:
+        raise ValueError("No binary specs found for the detected archive types")
+
+    binary_condition = " or ".join(
+        f"({build_binary_condition(binary, info)})"
         for binary, info in sorted(binaries.items())
     )
 
@@ -106,32 +159,29 @@ def build_inputs_rule(
         for p in sorted(extract_paths)
     )
 
-    # Use the first path in messages for readability.
     first_path = sorted(extract_paths)[0]
     rule_name = f"write_{PurePosixPath(first_path).name or 'extraction'}_dir"
 
+    formatted_binary_condition = format_condition(binary_condition)
     inner_yaml = dedent(f"""
-        - macro: cmd_events_flags
-          condition: >
-            {binary_condition.replace(" and ", " and\n            ")}
+    - macro: cmd_events_flags
+      condition: >
+        {formatted_binary_condition}
 
-        - macro: work_tmp_file
-          condition: {path_conditions}
+    - macro: work_tmp_file
+      condition: {path_conditions}
 
-        - macro: in_mainctrfs
-          condition: fs.path.name contains "/mainctrfs/"
+    - macro: in_mainctrfs
+      condition: fs.path.name contains "/mainctrfs/"
 
-        - rule: {rule_name}
-          desc: tar has activity outside {first_path}
-          condition: cmd_events_flags and (not work_tmp_file) and in_mainctrfs and k8s.ns.name = "{namespace}"
-          output: "Tar extraction outside of the intended path, {first_path} | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
-          priority: WARNING
-    """).strip() + "\n"
-
-    falco_rules = {
+    - rule: {rule_name}
+      desc: tar has activity outside {first_path}
+      condition: cmd_events_flags and (not work_tmp_file) and in_mainctrfs and k8s.ns.name = "{namespace}"
+      output: "Tar extraction outside of the intended path, {first_path} | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
+""").strip() + "\n"
+    return {
         "customRules": {
             rule_filename: LiteralStr(inner_yaml)
         }
     }
-
-    return falco_rules

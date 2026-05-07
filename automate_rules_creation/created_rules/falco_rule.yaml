@@ -2,12 +2,12 @@ customRules:
   detect_write_to_etc.yaml: |
     - macro: cmd_events_flags
       condition: >
-        proc.name = argoexec and
+        (proc.name = argoexec and
         evt.type=openat and
         (evt.arg.flags contains O_CLOEXEC and
         evt.arg.flags contains O_CREAT and
         evt.arg.flags contains O_F_CREATED and
-        evt.arg.flags contains O_RDWR)
+        evt.arg.flags contains O_RDWR))
 
     - macro: work_tmp_file
       condition: fs.path.name contains "/work/tmp" or fs.path.name contains "/mainctrfs/work/tmp"
