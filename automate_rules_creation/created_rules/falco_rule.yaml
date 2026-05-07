@@ -1,6 +1,6 @@
 customRules:
-  detect_write_to_etc.yaml: |-
-    macro: cmd_events_flags
+  detect_write_to_etc.yaml: |
+    - macro: cmd_events_flags
       condition: >
         proc.name = argoexec and
         evt.type=openat and

@@ -31,5 +31,5 @@ if __name__ == "__main__":
         customRule = build_inputs_rule(template.get("inputs"))
         print(yaml.safe_dump(customRule))
 
-        with open("falco_rule.yaml", "w") as f:
+        with open("./created_rules/falco_rule.yaml", "w") as f:
             yaml.safe_dump(customRule, f, sort_keys=False)

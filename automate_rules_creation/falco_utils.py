@@ -111,7 +111,7 @@ def build_inputs_rule(
     rule_name = f"write_{PurePosixPath(first_path).name or 'extraction'}_dir"
 
     inner_yaml = dedent(f"""
-         macro: cmd_events_flags
+        - macro: cmd_events_flags
           condition: >
             {binary_condition.replace(" and ", " and\n            ")}
 
@@ -126,7 +126,7 @@ def build_inputs_rule(
           condition: cmd_events_flags and (not work_tmp_file) and in_mainctrfs and k8s.ns.name = "{namespace}"
           output: "Tar extraction outside of the intended path, {first_path} | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
           priority: WARNING
-    """).strip()
+    """).strip() + "\n"
 
     falco_rules = {
         "customRules": {
