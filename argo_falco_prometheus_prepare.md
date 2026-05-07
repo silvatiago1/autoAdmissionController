@@ -23,7 +23,11 @@ kubectl port-forward svc/argo-workflows-server -n argo 2746:2746
 helm install --replace falco --namespace falco --create-namespace --set tty=true falcosecurity/falco
 
 ## Disable default rules and apply created rules
-helm upgrade --namespace falco falco falcosecurity/falco --set tty=true -f disable_rules.yaml -f detect_unwanted.yaml
+helm upgrade --namespace falco falco falcosecurity/falco \
+  --set tty=true \
+  --set falcoctl.artifact.install.enabled=false \
+  --set falcoctl.artifact.follow.enabled=false \
+  -f disable_rules.yaml -f detect_unwanted.yaml
 
 ## Wait for status to be ready:
 kubectl wait pods --for=condition=Ready --all -n falco
