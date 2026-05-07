@@ -4,7 +4,16 @@ kubectl create namespace argo
 helm install argo-workflows argo/argo-workflows \
   --namespace argo \
   --version 0.45.21 \
-  --set server.serviceType=ClusterIP
+  --set server.serviceType=ClusterIP \
+  --set images.pullPolicy=IfNotPresent
+### Sometimes, the cluster fails to reach the images, in that case, pull and load them:
+docker pull quay.io/argoproj/workflow-controller:v3.7.0
+docker pull quay.io/argoproj/argoexec:v3.7.0
+minikube image load quay.io/argoproj/workflow-controller:v3.7.0
+minikube image load quay.io/argoproj/argoexec:v3.7.0
+### Pulling every image manually is not ideal, so if in need of more images, run: 
+kubectl -n kube-system edit configmap coredns
+### And change the forward to 8.8.8.8 1.1.1.1
 
 ## Check status
 kubectl get pods -n argo
