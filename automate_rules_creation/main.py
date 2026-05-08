@@ -28,7 +28,9 @@ if __name__ == "__main__":
         
         # Only works for inputs with artifacts so far
         print("---------------Custom Rule:-------------:")
-        customRule = build_inputs_rule(template.get("inputs"))
+        #customRule = build_inputs_rule(template.get("inputs"))
+        print(separate_by_covered_fields(template))
+        customRule = build_fields_rule(template.get("inputs"))
         print(yaml.safe_dump(customRule))
 
         with open("./created_rules/falco_rule.yaml", "w") as f:
