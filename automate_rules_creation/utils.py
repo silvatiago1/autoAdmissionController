@@ -59,16 +59,15 @@ def load_covered_fields(path: str) -> set[str]:
             if line.strip()
         }
 
-def separate_by_covered_fields(manifest: yaml) -> List[any]:
-    """Receive a template, and separate it by its fields"""
+def get_covered_fields(manifest: dict) -> List[Tuple[str, Any]]:
+    """Receive a template, and return its covered fields"""
 
     covered_fields = load_covered_fields(Path("covered_fields"))
-    covered_present = []
-    
-    covered_present = {
-        key: manifest[key]
+
+    covered_present = [
+        (key, manifest[key])
         for key in manifest
         if key in covered_fields
-    }
-    
+    ]
+
     return covered_present

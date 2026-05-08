@@ -106,5 +106,5 @@ def build_fields_rule(
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
-    field_type = list(field.keys())[0]
+    field_type = field[0]
     print(field_type)
