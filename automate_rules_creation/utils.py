@@ -31,13 +31,6 @@ def get_argo_resource_name(manifest: yaml) -> Tuple[str, str]:
     else:
         raise ValueError(f"Unsupported kind: {kind}")
 
-def load_covered_fields(path: str) -> set[str]:
-    with open(path, "r") as f:
-        return {
-            line.strip()
-            for line in f
-            if line.strip()
-        }
 
 def separate_argo_templates(workflow: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -57,12 +50,25 @@ def separate_argo_templates(workflow: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     return [deepcopy(template) for template in templates]
 
+def load_covered_fields(path: str) -> set[str]:
+    """Load the fields whose data has been collected and place in the covered_fields file"""
+    with open(path, "r") as f:
+        return {
+            line.strip()
+            for line in f
+            if line.strip()
+        }
+
 def separate_by_covered_fields(manifest: yaml) -> List[any]:
+    """Receive a template, and separate it by its fields"""
 
     covered_fields = load_covered_fields(Path("covered_fields"))
     covered_present = []
-    for i in list(manifest.keys()):
-        if i in covered_fields and i not in covered_present:
-            covered_present.append(i)
+    
+    covered_present = {
+        key: manifest[key]
+        for key in manifest
+        if key in covered_fields
+    }
     
     return covered_present
