@@ -5,8 +5,66 @@ from typing import Any, Dict, Set
 from dataclasses import dataclass, field
 from textwrap import dedent
 import yaml
+from collections.abc import Mapping
 
+def matched_specs(banana, orange):
+    """
+    Return a list of {"command": ..., "events": ..., "flags": ...}
+    for every banana subtree whose key-path exists in orange.
 
+    Matching rules:
+    - dict keys must exist along the path
+    - lists/tuples in orange match if ANY element matches
+    - leaf values under the matched banana node are returned as-is
+    """
+
+    def path_exists(path, node):
+        if not path:
+            return True
+
+        key = path[0]
+
+        if isinstance(node, Mapping):
+            return key in node and path_exists(path[1:], node[key])
+
+        if isinstance(node, (list, tuple)):
+            return any(path_exists(path, item) for item in node)
+
+        return False
+
+    def walk(node, path=()):
+        if not isinstance(node, Mapping):
+            return
+
+        # If this node has the payload keys and its path exists in orange, keep it.
+        if all(k in node for k in ("command", "events", "flags")) and path_exists(path, orange):
+            yield {
+                "command": node["command"],
+                "events": node["events"],
+                "flags": node["flags"],
+            }
+
+        # Recurse into children
+        for k, v in node.items():
+            if isinstance(v, Mapping):
+                yield from walk(v, path + (k,))
+            elif isinstance(v, (list, tuple)):
+                for item in v:
+                    if isinstance(item, Mapping):
+                        yield from walk(item, path + (k,))
+
+    return list(walk(banana))
+
+def load_field_specs(field, spec_dir):
+    """
+    Loads the specs file of the specific field
+    """
+    field_type = field[0]
+    specs_file = Path(spec_dir) / f"{field_type}.yaml"
+
+    with specs_file.open("r") as f:
+        return yaml.safe_load(f)
+    
 
 def build_fields_rule(
     field: Dict[str, Any],
@@ -16,11 +74,7 @@ def build_fields_rule(
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
-    field_type = field[0]
-    
-    match field_type:
-        case "inputs":
-            input_type = list(field[1].keys())[0]
-            input_name = (field[1])[input_type][0]['name']
-            input_path = (field[1])[input_type][0]['path']
-    
+
+    field_specs= load_field_specs(field, spec_dir)
+
+    print(matched_specs(field_specs, field))
