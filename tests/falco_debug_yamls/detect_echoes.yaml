@@ -1,0 +1,16 @@
+customRules:
+  container_inputs_parameters.yaml: |
+    - macro: cmd_events_flags
+      condition: >
+        proc.cmdline contains "echo"
+
+    - macro: file
+      condition:
+        fd.name = "/var/run/argo/ctr/main/exitcode"
+
+    - rule: container_inputs_parameters
+      desc: echo has activity inside /workspace/message
+      condition: cmd_events_flags and file and k8s.ns.name = "argo"
+      output: "Echo Echo | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
+      

@@ -14,3 +14,4 @@ artifacts:
           - O_CLOEXEC
           - O_RDWR
           - O_F_CREATED
+#TODO: I'll have to configure the other fields that may differ from workflow to workflow, after testing how each of them affects syscalls

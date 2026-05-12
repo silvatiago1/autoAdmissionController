@@ -1,0 +1,15 @@
+customRules:
+  detect_argoexec.yaml: |
+    - macro: cmd_events_flags
+      condition: >
+        proc.name = argoexec
+
+    - macro: spec_pod
+      condition: k8s.pod.name startswith "hello-world-"
+
+    - rule: detect_argoexec
+      desc: argoexec
+      condition: (not cmd_events_flags) and spec_pod and k8s.ns.name = "argo"
+      output: "Not Argoexec called | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
+      
