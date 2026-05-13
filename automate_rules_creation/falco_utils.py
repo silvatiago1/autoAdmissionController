@@ -65,7 +65,7 @@ def load_field_specs(field, spec_dir):
     with specs_file.open("r") as f:
         return yaml.safe_load(f)
     
-def extraction_rule_create(cmd_evt_flags, path):
+def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix):
     proc_name = cmd_evt_flags['command'][0]
     evt_type = cmd_evt_flags['events']['items'][0]
     flags = cmd_evt_flags['flags']['items']
@@ -80,17 +80,49 @@ def extraction_rule_create(cmd_evt_flags, path):
         f"({flags_condition}))"
     )
 
-    return
+    # Define the rule structure
+    rule_data = [
+        {
+            "macro": "cmd_events_flags",
+            "condition": macro_cmd_events
+        },
+        {
+            "macro": "file_path",
+            "condition": f'fs.path.name contains \"{path}\" or fs.path.name contains \"/mainctrfs{path}\"'
+        },
+        {
+            "macro": "in_mainctrfs",
+            "condition": 'fs.path.name contains \"/mainctrfs/\"'
+        },
+        {
+            "macro": "in_pod",
+            "condition": f'k8s.pod.name startswith "{name_prefix}"'
+        },
+        {
+            "rule": "write_tmp_dir",
+            "desc": f'File extraction outside {path}',
+            "condition": f'cmd_events_flags and (not file_path) and in_mainctrfs and k8s.ns.name = "{namespace}" and in_pod',
+            "output": f'File extraction outside of the intended path, {path} | user= %user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags',
+            "priority": "WARNING"
+        }
+    ]
+    yaml_content = yaml.dump(rule_data, sort_keys=False, default_flow_style=False)
+    final_output = {
+        "customRules": {
+            f'detect_path_extraction_{name_prefix}.yaml': yaml_content
+        }
+    }
+    return final_output
     
 def build_fields_rule(
     field: Dict[str, Any],
+    name_prefix,
     namespace: str = "argo",
     spec_dir: str | Path = "field_specs",
 ) -> Dict[str, Any]:
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
-
     field_specs= load_field_specs(field, spec_dir)
     
     ### This part is assuming that it's something with path, will be altered in the future
@@ -99,4 +131,4 @@ def build_fields_rule(
 
     cmd_evt_flags = matched_specs(field_specs, field)
                                 # Possibly have several rules, if several combinations of cmd_evt_flags are possible for a configuration
-    print(extraction_rule_create(cmd_evt_flags[0], extraction_path))
+    return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix)

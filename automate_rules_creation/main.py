@@ -22,6 +22,8 @@ if __name__ == "__main__":
     
     ### Separate each template in the workflow
     templates = separate_argo_templates(yaml_data)
+
+    ### Build the rules for each template
     for template in templates:
         print(yaml.safe_dump(template, sort_keys=False))
         print("---")
@@ -31,8 +33,7 @@ if __name__ == "__main__":
         #customRule = build_inputs_rule(template.get("inputs"))
         covered_fields = get_covered_fields(template)
         for i in covered_fields:
-            print(i)
-            customRule = build_fields_rule(i)
+            customRule = build_fields_rule(i, name_prefix=name)
             print(yaml.safe_dump(customRule))
 
             with open("./created_rules/falco_rule.yaml", "w") as f:
