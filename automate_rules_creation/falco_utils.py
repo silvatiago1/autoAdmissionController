@@ -65,7 +65,23 @@ def load_field_specs(field, spec_dir):
     with specs_file.open("r") as f:
         return yaml.safe_load(f)
     
+def extraction_rule_create(cmd_evt_flags, path):
+    proc_name = cmd_evt_flags['command'][0]
+    evt_type = cmd_evt_flags['events']['items'][0]
+    flags = cmd_evt_flags['flags']['items']
+    
+    # Construct the condition strings
+    # Joining flags with 'and' for the macro
+    flags_condition = " and ".join([f"evt.arg.flags contains {f}" for f in flags])
+    
+    macro_cmd_events = (
+        f"(proc.name = {proc_name} and\n"
+        f"evt.type={evt_type} and\n"
+        f"({flags_condition}))"
+    )
 
+    return
+    
 def build_fields_rule(
     field: Dict[str, Any],
     namespace: str = "argo",
@@ -76,5 +92,11 @@ def build_fields_rule(
     """
 
     field_specs= load_field_specs(field, spec_dir)
+    
+    ### This part is assuming that it's something with path, will be altered in the future
+    key = list(field[1].keys())[0]
+    extraction_path = (field[1])[key][0]['path']
 
-    print(matched_specs(field_specs, field))
+    cmd_evt_flags = matched_specs(field_specs, field)
+                                # Possibly have several rules, if several combinations of cmd_evt_flags are possible for a configuration
+    print(extraction_rule_create(cmd_evt_flags[0], extraction_path))
