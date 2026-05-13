@@ -1,13 +1,22 @@
 customRules:
-  detect_path_extraction_zipslip-.yaml: "- macro: cmd_events_flags\n  condition: '(proc.name\
-    \ = argoexec and\n\n    evt.type=openat and\n\n    (evt.arg.flags contains O_CREAT\
-    \ and evt.arg.flags contains O_CLOEXEC and evt.arg.flags\n    contains O_RDWR\
-    \ and evt.arg.flags contains O_F_CREATED))'\n- macro: file_path\n  condition:\
-    \ fs.path.name contains \"/work/tmp\" or fs.path.name contains \"/mainctrfs/work/tmp\"\
-    \n- macro: in_mainctrfs\n  condition: fs.path.name contains \"/mainctrfs/\"\n\
-    - macro: in_pod\n  condition: k8s.pod.name startswith \"zipslip-\"\n- rule: write_tmp_dir\n\
-    \  desc: File extraction outside /work/tmp\n  condition: cmd_events_flags and\
-    \ (not file_path) and in_mainctrfs and k8s.ns.name\n    = \"argo\" and in_pod\n\
-    \  output: File extraction outside of the intended path, /work/tmp | user= %user.name\n\
-    \    command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags\n\
-    \  priority: WARNING\n"
+  zipslip-detect_path_extraction.yaml: |
+    - macro: cmd_events_flags
+      condition: >
+        (proc.name = argoexec and
+        evt.type=openat and
+        (evt.arg.flags contains O_CREAT and evt.arg.flags contains O_CLOEXEC and evt.arg.flags contains O_RDWR and evt.arg.flags contains O_F_CREATED))
+
+    - macro: file_path
+      condition: fs.path.name contains "/work/tmp" or fs.path.name contains "/mainctrfs/work/tmp"
+
+    - macro: in_mainctrfs
+      condition: fs.path.name contains "/mainctrfs/"
+
+    - macro: in_pod
+      condition: k8s.pod.name startswith "zipslip-"
+
+    - rule: write_tmp_dir
+      desc: File extraction outside /work/tmp
+      condition: cmd_events_flags and (not file_path) and in_mainctrfs and k8s.ns.name = "argo" and in_pod
+      output: "File extraction outside of the intended path, /work/tmp | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING

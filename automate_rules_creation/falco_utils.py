@@ -7,6 +7,20 @@ from textwrap import dedent
 import yaml
 from collections.abc import Mapping
 
+class LiteralStr(str):
+    pass
+
+yaml.SafeDumper.add_representer(
+    LiteralStr,
+    lambda dumper, data: dumper.represent_scalar(
+        "tag:yaml.org,2002:str", data, style="|"
+    ),
+)
+
+def _indent(text, n=4):
+    pad = " " * n
+    return "\n".join(pad + line if line else line for line in text.splitlines())
+
 def matched_specs(banana, orange):
     """
     Return a list of {"command": ..., "events": ..., "flags": ...}
@@ -74,42 +88,37 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix):
     # Joining flags with 'and' for the macro
     flags_condition = " and ".join([f"evt.arg.flags contains {f}" for f in flags])
     
-    macro_cmd_events = (
-        f"(proc.name = {proc_name} and\n"
-        f"evt.type={evt_type} and\n"
-        f"({flags_condition}))"
-    )
+    macro_cmd_events = dedent(f"""\
+(proc.name = {proc_name} and
+      {_indent(f'evt.type={evt_type}',2)} and
+      {_indent(f'({flags_condition}))',2)}
+        """).strip()
 
-    # Define the rule structure
-    rule_data = [
-        {
-            "macro": "cmd_events_flags",
-            "condition": macro_cmd_events
-        },
-        {
-            "macro": "file_path",
-            "condition": f'fs.path.name contains \"{path}\" or fs.path.name contains \"/mainctrfs{path}\"'
-        },
-        {
-            "macro": "in_mainctrfs",
-            "condition": 'fs.path.name contains \"/mainctrfs/\"'
-        },
-        {
-            "macro": "in_pod",
-            "condition": f'k8s.pod.name startswith "{name_prefix}"'
-        },
-        {
-            "rule": "write_tmp_dir",
-            "desc": f'File extraction outside {path}',
-            "condition": f'cmd_events_flags and (not file_path) and in_mainctrfs and k8s.ns.name = "{namespace}" and in_pod',
-            "output": f'File extraction outside of the intended path, {path} | user= %user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags',
-            "priority": "WARNING"
-        }
-    ]
-    yaml_content = yaml.dump(rule_data, sort_keys=False, default_flow_style=False)
+    # Define the rule structure and create said rule
+    yaml_content = dedent(f"""\
+    - macro: cmd_events_flags
+      condition: >
+        {macro_cmd_events}
+
+    - macro: file_path
+      condition: fs.path.name contains "{path}" or fs.path.name contains "/mainctrfs{path}"
+
+    - macro: in_mainctrfs
+      condition: fs.path.name contains "/mainctrfs/"
+
+    - macro: in_pod
+      condition: k8s.pod.name startswith "{name_prefix}"
+
+    - rule: write_tmp_dir
+      desc: File extraction outside {path}
+      condition: cmd_events_flags and (not file_path) and in_mainctrfs and k8s.ns.name = "{namespace}" and in_pod
+      output: "File extraction outside of the intended path, {path} | user=%user.name command=%proc.cmdline file=%fd.name evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
+    """)
+
     final_output = {
         "customRules": {
-            f'detect_path_extraction_{name_prefix}.yaml': yaml_content
+            f"{name_prefix}detect_path_extraction.yaml": LiteralStr(yaml_content)
         }
     }
     return final_output
