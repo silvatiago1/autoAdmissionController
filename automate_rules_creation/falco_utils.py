@@ -117,7 +117,7 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix):
 
     - rule: write_tmp_dir
       desc: File extraction outside {path}
-      condition: ((cmd_events_flags and (not file_path) and in_mainctrfs) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod
+      condition: ((cmd_events_flags and (not file_path) and in_mainctrfs) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init"
       output: "File extraction outside of the intended path, {path} | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING
     """)
