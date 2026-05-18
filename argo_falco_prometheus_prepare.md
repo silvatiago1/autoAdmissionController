@@ -6,12 +6,8 @@ helm install argo-workflows argo/argo-workflows \
   --version 0.45.21 \
   --set server.serviceType=ClusterIP \
   --set images.pullPolicy=IfNotPresent
-### Sometimes, the cluster fails to reach the images, in that case, pull and load them:
-docker pull quay.io/argoproj/workflow-controller:v3.7.0
-docker pull quay.io/argoproj/argoexec:v3.7.0
-minikube image load quay.io/argoproj/workflow-controller:v3.7.0
-minikube image load quay.io/argoproj/argoexec:v3.7.0
-### Pulling every image manually is not ideal, so if in need of more images, run: 
+  
+### If the images are not being found: 
 kubectl -n kube-system edit configmap coredns
 ### And change the forward to 8.8.8.8 1.1.1.1
 
@@ -27,6 +23,32 @@ kubectl create rolebinding default-admin \
 
 ## Enable UI
 kubectl port-forward svc/argo-workflows-server -n argo 2746:2746
+
+## Add Minio Artifact Storage
+
+### Minio
+helm install argo-artifacts minio/minio \
+  --namespace argo \
+  --set mode=standalone \
+  --set rootUser=minioadmin \
+  --set rootPassword=minioadmin \
+  --set resources.requests.memory=1Gi \
+  --set persistence.size=5Gi \
+  --set service.type=LoadBalancer \
+  --set fullnameOverride=argo-artifacts
+
+### Apply Minio
+In this repo, go to /minio and apply the configuration present in there
+
+minikube tunnel
+### Test if Minio is working
+kubectl get svc -n argo argo-artifacts
+
+kubectl run -n argo mc --image=minio/mc --restart=Never --command -- sleep 3600
+kubectl exec -n argo -it mc -- mc alias set local http://argo-artifacts.argo.svc.cluster.local:9000 minioadmin minioadmin
+kubectl exec -n argo -it mc -- mc admin info local
+kubectl exec -n argo -it mc -- mc mb local/my-bucket
+kubectl exec -n argo -it mc -- mc ls local
 
 # Falco
 helm install --replace falco --namespace falco --create-namespace --set tty=true falcosecurity/falco
