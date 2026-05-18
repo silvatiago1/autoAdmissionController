@@ -1,0 +1,7 @@
+customRules:
+  detect_outside_scope.yaml: |
+    - rule: write_work_dir
+      desc: tar has activity outside /work/tmp
+      condition: fs.path.name contains "hello-art" and k8s.ns.name = "argo"
+      output: "Artifact Captured | user=%user.name command=%proc.cmdline parent=%proc.acmdline[1] grandparent=%proc.aname[2] file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING

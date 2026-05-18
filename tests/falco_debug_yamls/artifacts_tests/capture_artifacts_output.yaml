@@ -10,10 +10,13 @@ customRules:
       condition: evt.arg.linkpath startswith "/argo/inputs/artifacts/"
 
     - macro: correct_file
-      condition: fs.path.name contains "hello_world.txt"
+      condition: fs.path.name="/tmp/hello_world.txt"
+
+    - macro: command
+      condition: proc.cmdline="argoexec emissary --loglevel info --log-format text --gloglevel 0 -- sh -c echo hello world | tee /tmp/hello_world.txt"
 
     - rule: write_work_dir
       desc: tar has activity outside /work/tmp
-      condition: correct_file and k8s.ns.name = "argo"
+      condition: correct_file and k8s.ns.name = "argo" and command
       output: "Artifact Captured | user=%user.name command=%proc.cmdline parent=%proc.acmdline[1] grandparent=%proc.aname[2] file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING
