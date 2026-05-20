@@ -87,7 +87,7 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix):
     # Construct the condition strings
     # Joining flags with 'and' for the macro
     flags_condition = " and ".join([f"evt.arg.flags contains {f}" for f in flags])
-    
+    #TODO:add argoexec init command when receiving input artifacts
     macro_cmd_events = dedent(f"""\
 (proc.name = {proc_name} and
       {_indent(f'evt.type={evt_type}',2)} and
