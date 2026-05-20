@@ -32,11 +32,8 @@ spec:
       # generate hello-art artifact from /tmp/hello_world.txt
       # artifacts can be directories as well as files
       - name: hello-art
-      ver se ao mandar um zipslip, o conteudo chega bem ao hello-art
         path: /tmp/hello_world.txt
-
   - name: print-message-from-file
-  ver se usando um s3 bucket aqui tb usa mainctrfs, e ver como é quando receber zipslip do outro passo
     inputs:
       artifacts:
       # unpack the message input artifact

@@ -1,0 +1,5 @@
+Artifact Inputs are always collected by argoexec init. Input artifacts are placed in "/argo/inputs/artifacts/{name}.tmpdir/{file_name}"
+Artifact Outputs are placed in /tmp/argo/outputs/artifacts/{name}, before that, they are placed inside their container, on the directory indicated by the workflow.
+
+Mainctrfs is only used when the artifact path overlaps a user volume mount. Can't use it to detect if therewas a zipslip, but
+can use it to distinguish whether the zipslip occured in a normal argo path, or in a mounted volume path. 
