@@ -54,7 +54,7 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name
       condition: fs.path.name="/var/run/argo/argoexec" or fs.path.name="/argo/inputs/artifacts/{art_name}.tmp" or fs.path.name="/var/run/argo/template" or fs.path.name startswith "/argo/inputs/artifacts/{art_name}.tmpdir/"
 
 
-    - rule: write_tmp_dir
+    - rule: {name_prefix}detect-path-extraction-arg-path
       desc: File extraction outside {path}
       condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" and in_mainctrfs
       output: "File extraction outside of the intended path, to a mounted volume's path, {path} | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
@@ -85,7 +85,7 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name
       condition: fs.path.name="/var/run/argo/argoexec" or fs.path.name="/argo/inputs/artifacts/{art_name}.tmp" or fs.path.name="/var/run/argo/template" or fs.path.name startswith "/argo/inputs/artifacts/{art_name}.tmpdir/"
 
 
-    - rule: write_tmp_dir
+    - rule: {name_prefix}detect-path-extraction-mnt-vol
       desc: File extraction outside {path}
       condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" and not in_mainctrfs
       output: "File extraction outside of the intended path, to an Argo path, {path} | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
@@ -94,8 +94,8 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name
 
     final_output = {
         "customRules": {
-            f"{name_prefix}detect_path_extraction_mnt_vol.yaml": LiteralStr(yaml_mounted_volume),
-            f"{name_prefix}detect_path_extraction_arg_path.yaml": LiteralStr(yaml_argo_path)
+            f"{name_prefix}detect-path-extraction-mnt-vol.yaml": LiteralStr(yaml_mounted_volume),
+            f"{name_prefix}detect-path-extraction-arg-path.yaml": LiteralStr(yaml_argo_path)
         }
     }
     return final_output

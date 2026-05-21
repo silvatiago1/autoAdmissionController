@@ -36,6 +36,6 @@ if __name__ == "__main__":
             customRule = build_fields_rule(i, name_prefix=name)
             print(yaml.safe_dump(customRule))
 
-            with open(f"./created_rules/{name}rule.yaml", "w") as f:
+            with open(f"./created_rules/{name}rules.yaml", "w") as f:
                 yaml.safe_dump(customRule, f, sort_keys=False)
         
