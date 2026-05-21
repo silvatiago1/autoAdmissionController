@@ -1,4 +1,20 @@
-    
+from textwrap import dedent
+import yaml
+
+class LiteralStr(str):
+    pass
+
+def represent_literal_str(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+yaml.add_representer(LiteralStr, represent_literal_str)
+yaml.SafeDumper.add_representer(LiteralStr, represent_literal_str)
+
+def _indent(text, n=4):
+    pad = " " * n
+    return "\n".join(pad + line if line else line for line in text.splitlines())
+
+
 def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name):
     proc_name = cmd_evt_flags['command'][0]
     evt_type = cmd_evt_flags['events']['items'][0]

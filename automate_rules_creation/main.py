@@ -1,6 +1,7 @@
 import sys
 from utils import *
 from falco_utils import *
+from rule_templates import *
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
