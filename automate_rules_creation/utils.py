@@ -1,5 +1,5 @@
 import yaml
-from typing import Tuple, Any, Dict, List
+from typing import Tuple, Any, Dict, List, Optional
 from copy import deepcopy
 from pathlib import Path
 
@@ -71,3 +71,29 @@ def get_covered_fields(manifest: dict) -> List[Tuple[str, Any]]:
     ]
 
     return covered_present
+
+def get_container_template_name(template: Dict[str, Any]) -> Optional[str]:
+    """
+    Checks if an Argo template contains an active container execution context.
+    
+    Returns:
+        str: The name of the template if it runs a container.
+        None: If the template has no container context or is invalid.
+    """
+    if not isinstance(template, dict):
+        return None
+        
+    # Define fields that imply active container execution
+    container_keys = {"container", "script", "containerSet"}
+    
+    has_sidecars = (
+        "sidecars" in template 
+        and isinstance(template["sidecars"], list) 
+        and len(template["sidecars"]) > 0
+    )
+    
+    # If it has any container-centric field, return its template name
+    if has_sidecars or any(key in template for key in container_keys):
+        return template.get("name")
+        
+    return None

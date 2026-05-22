@@ -14,7 +14,7 @@ def _indent(text, n=4):
     pad = " " * n
     return "\n".join(pad + line if line else line for line in text.splitlines())
 
-def _build_extraction_rule_shared_block(cmd_evt_flags, path, name_prefix, art_name, mainctrfs_condition, rule_suffix, output_suffix):
+def _build_extraction_rule_shared_block(cmd_evt_flags, path, namespace, name_prefix, art_name, mainctrfs_condition, rule_suffix, output_suffix, extra_pod_text):
     proc_name = cmd_evt_flags["command"][0]
     evt_type = cmd_evt_flags["events"]["items"][0]
     flags = cmd_evt_flags["flags"]["items"]
@@ -40,7 +40,7 @@ def _build_extraction_rule_shared_block(cmd_evt_flags, path, name_prefix, art_na
           condition: fs.path.name contains "/mainctrfs/" or evt.arg.target contains "/mainctrfs/"
 
         - macro: in_pod
-          condition: k8s.pod.name startswith "{name_prefix}"
+          condition: k8s.pod.name startswith "{name_prefix}"{extra_pod_text}
 
         - macro: link_path_artifacts
           condition: evt.arg.linkpath startswith "/argo/inputs/artifacts/"
@@ -53,30 +53,37 @@ def _build_extraction_rule_shared_block(cmd_evt_flags, path, name_prefix, art_na
 
         - rule: {name_prefix}detect-path-extraction-{rule_suffix}
           desc: File extraction outside {path}
-          condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" {mainctrfs_condition}
+          condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "{namespace}" and in_pod and proc.cmdline startswith "argoexec init" {mainctrfs_condition}
           output: "File extraction outside of the intended path, to {output_suffix}, {path} | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
           priority: WARNING
     """)
 
-def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name):
+def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name, extra_template_container):
+    extra_pod_text=''
+    if(extra_template_container!=None):
+        extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'
     yaml_mounted_volume = _build_extraction_rule_shared_block(
         cmd_evt_flags=cmd_evt_flags,
         path=path,
+        namespace=namespace,
         name_prefix=name_prefix,
         art_name=art_name,
         mainctrfs_condition="and in_mainctrfs",
         rule_suffix="mnt-vol",
         output_suffix="a mounted volume's path",
+        extra_pod_text=extra_pod_text,
     )
 
     yaml_argo_path = _build_extraction_rule_shared_block(
         cmd_evt_flags=cmd_evt_flags,
         path=path,
+        namespace=namespace,
         name_prefix=name_prefix,
         art_name=art_name,
         mainctrfs_condition="and not in_mainctrfs",
         rule_suffix="arg-path",
         output_suffix="an Argo path",
+        extra_pod_text=extra_pod_text,
     )
 
     return {

@@ -69,11 +69,13 @@ def build_fields_rule(
     name_prefix,
     namespace: str = "argo",
     spec_dir: str | Path = "field_specs",
+    extra_template_container: str = None,
 ) -> Dict[str, Any]:
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
     field_specs= load_field_specs(field, spec_dir)
+    print(extra_template_container)
     ### This part is assuming that it's something with path, will be altered in the future
     key = list(field[1].keys())[0]
     extraction_path = (field[1])[key][0]['path']
@@ -81,4 +83,4 @@ def build_fields_rule(
 
     cmd_evt_flags = matched_specs(field_specs, field)
                                 # Possibly have several rules, if several combinations of cmd_evt_flags are possible for a configuration
-    return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name)
+    return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)

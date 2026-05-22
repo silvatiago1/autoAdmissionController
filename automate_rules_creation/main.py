@@ -23,17 +23,19 @@ if __name__ == "__main__":
     
     ### Separate each template in the workflow
     templates = separate_argo_templates(yaml_data)
+    print("banana\n".join(str(t) for t in templates))
 
     ### Build the rules for each template
     for template in templates:
         print(yaml.safe_dump(template, sort_keys=False))
         print("---")
-        
+        container=get_container_template_name(template)
+
         #TODO: Only works for inputs with artifacts so far
         print("---------------Custom Rule:-------------:")
         covered_fields = get_covered_fields(template)
         for i in covered_fields:
-            customRule = build_fields_rule(i, name_prefix=name)
+            customRule = build_fields_rule(i, name_prefix=name, extra_template_container=container)
             print(yaml.safe_dump(customRule))
 
             with open(f"./created_rules/{name}rules.yaml", "w") as f:
