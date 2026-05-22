@@ -1,0 +1,21 @@
+#https://argo-workflows.readthedocs.io/en/latest/walk-through/parameters/
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: hello-world-parameters-
+spec:
+  entrypoint: write-and-read
+  templates:
+  - name: write-and-read
+    container:
+      image: alpine:3.23
+      command: [sh, -c]
+      args:
+        - |
+          echo "hello world" > /tmp/message
+          cat /tmp/message
+    outputs:
+      parameters:
+      - name: message
+        valueFrom:
+          path: /tmp/message

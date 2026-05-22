@@ -6,3 +6,10 @@ Mainctrfs is only used when the artifact path overlaps a user volume mount. Can'
 can use it to distinguish whether the zipslip occured in a normal argo path, or in a mounted volume path.
 
 # Parameters
+As inputs: Can not receive parameters as inputs directly into a file, and from what I have seen, I do not think that there is a way to detect their currect placement.
+
+As outputs: Can be detected when present in the following format:
+```
+outputs:
+      parameters:
+```
