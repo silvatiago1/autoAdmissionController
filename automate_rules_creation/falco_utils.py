@@ -74,13 +74,21 @@ def build_fields_rule(
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
-    field_specs= load_field_specs(field, spec_dir)
-    print(extra_template_container)
-    ### This part is assuming that it's something with path, will be altered in the future
+    if(field[0]!="container"):
+        field_specs= load_field_specs(field, spec_dir)
+        cmd_evt_flags = matched_specs(field_specs, field)
+        
     key = list(field[1].keys())[0]
-    extraction_path = (field[1])[key][0]['path']
-    art_name = (field[1])[key][0]['name']
-
-    cmd_evt_flags = matched_specs(field_specs, field)
-                                # Possibly have several rules, if several combinations of cmd_evt_flags are possible for a configuration
-    return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
+    # Extract path, if it exists
+    if('path' in field[1][key][0]):
+        extraction_path = (field[1])[key][0]['path']
+        art_name = (field[1])[key][0]['name']
+    
+    field_type = field[0]
+    match field_type:
+        case "container":
+            return "Orangotan"
+        case "inputs":
+            return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
+        case _:
+            return "Error, field type not configured"

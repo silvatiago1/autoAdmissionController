@@ -31,7 +31,7 @@ if __name__ == "__main__":
         print("---")
         container=get_container_template_name(template)
 
-        #TODO: Only works for inputs with artifacts so far
+        #TODO: Only works for inputs and containers so far
         print("---------------Custom Rule:-------------:")
         covered_fields = get_covered_fields(template)
         for i in covered_fields:
