@@ -63,7 +63,8 @@ def load_field_specs(field, spec_dir):
 
     with specs_file.open("r") as f:
         return yaml.safe_load(f)
-    
+
+
 def build_fields_rule(
     field: Dict[str, Any],
     name_prefix,
@@ -79,6 +80,7 @@ def build_fields_rule(
         cmd_evt_flags = matched_specs(field_specs, field)
         
     key = list(field[1].keys())[0]
+
     # Extract path, if it exists
     if('path' in field[1][key][0]):
         extraction_path = (field[1])[key][0]['path']
@@ -87,8 +89,10 @@ def build_fields_rule(
     field_type = field[0]
     match field_type:
         case "container":
-            return "Orangotan"
+            command = field[1]["command"]
+            args = field[1]["args"]
+            return container_rules_create(namespace, name_prefix, extra_template_container, command, args)
         case "inputs":
-            return extraction_rule_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
+            return extraction_rules_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
         case _:
             return "Error, field type not configured"

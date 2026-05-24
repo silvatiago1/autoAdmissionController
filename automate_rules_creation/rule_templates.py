@@ -58,7 +58,7 @@ def _build_extraction_rule_shared_block(cmd_evt_flags, path, namespace, name_pre
           priority: WARNING
     """)
 
-def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name, extra_template_container):
+def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_name, extra_template_container):
     extra_pod_text=''
     if(extra_template_container!=None):
         extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'
@@ -92,3 +92,6 @@ def extraction_rule_create(cmd_evt_flags, path, namespace, name_prefix, art_name
             f"{name_prefix}detect-path-extraction-arg-path.yaml": LiteralStr(yaml_argo_path),
         }
     }
+
+def container_rules_create(namespace, name_prefix, extra_template_container, command, args):
+    return "Orangutan"

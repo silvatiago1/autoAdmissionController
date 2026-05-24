@@ -1,3 +1,4 @@
+---
 customRules:
   artifact-passing-detect-path-extraction-mnt-vol.yaml: |
     - macro: cmd_events_flags
@@ -59,3 +60,6 @@ customRules:
       condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" and not in_mainctrfs
       output: "File extraction outside of the intended path, to an Argo path, /tmp/message | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING
+---
+Orangutan
+...

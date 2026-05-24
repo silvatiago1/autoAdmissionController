@@ -34,10 +34,11 @@ if __name__ == "__main__":
         #TODO: Only works for inputs and containers so far
         print("---------------Custom Rule:-------------:")
         covered_fields = get_covered_fields(template)
-        for i in covered_fields:
-            customRule = build_fields_rule(i, name_prefix=name, extra_template_container=container)
-            print(yaml.safe_dump(customRule))
+        with open(f"./created_rules/{name}rules.yaml", "w") as f:
+            for i in covered_fields:
+                customRule = build_fields_rule(i, name_prefix=name, extra_template_container=container)
+                print(yaml.safe_dump(customRule))
 
-            with open(f"./created_rules/{name}rules.yaml", "w") as f:
-                yaml.safe_dump(customRule, f, sort_keys=False)
+                f.write("---\n")
+                yaml.safe_dump(customRule, f, sort_keys=False)  
         
