@@ -1,0 +1,7 @@
+customRules:
+  detect_argo.yaml: |
+    - rule: detect_argo
+      desc: Detect non argo commands
+      condition: k8s.ns.name = "argo" and proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
+      output: "Detected non-argo command proc_name=%proc.name proc=%proc.cmdline container=%container.id evt=%evt.type path=%fs.path.name rawname=%fs.path.nameraw source=%fs.path.source target=%fs.path.target evt_arg_flags=%evt.arg.flags"
+      priority: INFO
