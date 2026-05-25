@@ -89,9 +89,10 @@ def build_fields_rule(
     field_type = field[0]
     match field_type:
         case "container":
-            command = field[1]["command"]
-            args = field[1]["args"]
-            return container_rules_create(namespace, name_prefix, extra_template_container, command, args)
+            command_name = field[1]["command"][0]
+            command = " ".join(field[1]["command"])
+            args = " ".join(field[1]["args"])
+            return container_rules_create(namespace, name_prefix, extra_template_container, command_name, command, args)
         case "inputs":
             return extraction_rules_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
         case _:

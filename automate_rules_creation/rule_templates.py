@@ -91,59 +91,61 @@ def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_nam
             f"{name_prefix}detect-path-extraction-arg-path.yaml": LiteralStr(yaml_argo_path),
     }
 
-def _build_container_rules_create_shared_block(namespace, name_prefix, extra_template_container, command, conf_args, rule_specific_condition, rule_specific_text):
+def _build_container_rules_create_shared_block(namespace, name_prefix, extra_template_container, command_name, non_argo_cmd, conf_cmd_args, rule_specific_condition, rule_specific_text):
     extra_pod_text=''
     if(extra_template_container!=None):
         extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'
     return dedent(f"""\
-        - macro: non_argo_command
-          condition: proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
-{conf_args}
         - macro: conf_cmd
-          condition: proc.name="{command}"
-
+          condition: proc.name="{command_name}"
+{non_argo_cmd}
         - macro: in_pod
           condition: k8s.pod.name startswith "{name_prefix}"{extra_pod_text}
-
+{conf_cmd_args}
         - rule: {name_prefix}detect-container-unconfigured-commands
           desc: Non-Argo default command/Non-Defined in yaml command detected
-          condition: non_argo_command and {rule_specific_condition} and k8s.ns.name = "{namespace}" and in_pod
-          output: "{rule_specific_text} | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+          condition: {rule_specific_condition} and k8s.ns.name = "{namespace}" and in_pod
+          output: "{rule_specific_text} | user=%user.name command_name=%proc.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
           priority: WARNING
     """)
 
-#TODO: Need to adapt for when a container has several commands
-def container_rules_create(namespace, name_prefix, extra_template_container, command, args):
-    conf_args = ''
-    rule_specific_condition = 'not conf_cmd'
+def container_rules_create(namespace, name_prefix, extra_template_container, command_name, command, args):
+    '''conf_cmd_args =
+    non_argo_cmd=
+        - macro: non_argo_command
+          condition: proc.name exists and not proc.name in (argoexec, pause, workflow-contro) and not proc.name startswith runc
+{conf_cmd_args}
+    rule_specific_condition = 'non_argo_command and not conf_cmd'
     rule_specific_text = 'Detected non-configured command'
     yaml_not_in_conf_cmds = _build_container_rules_create_shared_block(
         namespace,
         name_prefix,
         extra_template_container,
         command,
-        conf_args,
+        non_argo_cmd,
+        conf_cmd_args,
         rule_specific_condition,
         rule_specific_text,
-    )
-
-    conf_args = f'''
-        - macro: conf_args
-          condition: proc.cmdline="{args}"
+    )'''
+    non_argo_cmd=''
+    conf_cmd_args = f'''
+        - macro: conf_cmd_args
+          condition: proc.cmdline="{command} {args}"
 '''
-    rule_specific_condition = 'conf_cmd and not conf_args'
+    rule_specific_condition = 'conf_cmd and not conf_cmd_args'
     rule_specific_text = 'Detected unknown args in configured command'
     yaml_in_conf_cmds_not_args = _build_container_rules_create_shared_block(
         namespace,
         name_prefix,
         extra_template_container,
-        command,
-        conf_args,
+        command_name,
+        non_argo_cmd,
+        conf_cmd_args,
         rule_specific_condition,
         rule_specific_text,
     )
 
     return {
-            f"{name_prefix}cmd-not-in-conf.yaml": LiteralStr(yaml_not_in_conf_cmds),
+            #f"{name_prefix}cmd-not-in-conf.yaml": LiteralStr(yaml_not_in_conf_cmds),
             f"{name_prefix}cmd-in-conf-not-args.yaml": LiteralStr(yaml_in_conf_cmds_not_args),
     }
