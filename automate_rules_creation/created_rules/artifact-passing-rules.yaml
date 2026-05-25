@@ -1,5 +1,37 @@
----
 customRules:
+  artifact-passing-cmd-not-in-conf.yaml: |
+    - macro: non_argo_command
+      condition: proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
+
+    - macro: conf_cmd
+      condition: proc.name="['sh', '-c']"
+
+    - macro: in_pod
+      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
+
+    - rule: artifact-passing-detect-container-unconfigured-commands
+      desc: Non-Argo default command/Non-Defined in yaml command detected
+      condition: non_argo_command and not conf_cmd and k8s.ns.name = "argo"
+      output: "Detected non-configured command | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
+  artifact-passing-cmd-in-conf-not-args.yaml: |
+    - macro: non_argo_command
+      condition: proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
+
+    - macro: conf_args
+      condition: proc.cmdline="['cat /tmp/message']"
+
+    - macro: conf_cmd
+      condition: proc.name="['sh', '-c']"
+
+    - macro: in_pod
+      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
+
+    - rule: artifact-passing-detect-container-unconfigured-commands
+      desc: Non-Argo default command/Non-Defined in yaml command detected
+      condition: non_argo_command and conf_cmd and not conf_args and k8s.ns.name = "argo" and in_pod
+      output: "Detected unknown args in configured command | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+      priority: WARNING
   artifact-passing-detect-path-extraction-mnt-vol.yaml: |
     - macro: cmd_events_flags
       condition: >
@@ -59,39 +91,4 @@ customRules:
       desc: File extraction outside /tmp/message
       condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" and not in_mainctrfs
       output: "File extraction outside of the intended path, to an Argo path, /tmp/message | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
-      priority: WARNING
----
-customRules:
-  artifact-passing-cmd-not-in-conf.yaml: |
-    - macro: non_argo_command
-      condition: proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
-
-    - macro: conf_cmd
-      condition: proc.name="['sh', '-c']"
-
-    - macro: in_pod
-      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
-
-    - rule: artifact-passing-detect-container-unconfigured-commands
-      desc: Non-Argo default command/Non-Defined in yaml command detected
-      condition: non_argo_command and not conf_cmd and k8s.ns.name = "argo"
-      output: "Detected non-configured command | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
-      priority: WARNING
-  artifact-passing-cmd-in-conf-not-args.yaml: |
-    - macro: non_argo_command
-      condition: proc.name exists and not proc.name in (argoexec, pause) and not proc.name startswith runc
-
-    - macro: conf_args
-      condition: proc.cmdline="['cat /tmp/message']"
-
-    - macro: conf_cmd
-      condition: proc.name="['sh', '-c']"
-
-    - macro: in_pod
-      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
-
-    - rule: artifact-passing-detect-container-unconfigured-commands
-      desc: Non-Argo default command/Non-Defined in yaml command detected
-      condition: non_argo_command and conf_cmd and not conf_args and k8s.ns.name = "argo"
-      output: "Detected unknown args in configured command | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING

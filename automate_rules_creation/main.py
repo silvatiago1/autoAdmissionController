@@ -26,19 +26,25 @@ if __name__ == "__main__":
     print("banana\n".join(str(t) for t in templates))
 
     ### Build the rules for each template
-    for template in templates:
-        print(yaml.safe_dump(template, sort_keys=False))
-        print("---")
-        container=get_container_template_name(template)
+    with open(f"./created_rules/{name}rules.yaml", "w") as f:
+        all_custom_rules = {}
 
-        #TODO: Only works for inputs and containers so far
-        print("---------------Custom Rule:-------------:")
-        covered_fields = get_covered_fields(template)
-        with open(f"./created_rules/{name}rules.yaml", "w") as f:
+        for template in templates:
+            print(yaml.safe_dump(template, sort_keys=False))
+            print("---")
+            container = get_container_template_name(template)
+
+            #TODO: Only works for inputs and containers so far
+            print("---------------Custom Rule:-------------:")
+            covered_fields = get_covered_fields(template)
+            
             for i in covered_fields:
                 customRule = build_fields_rule(i, name_prefix=name, extra_template_container=container)
                 print(yaml.safe_dump(customRule))
-
-                f.write("---\n")
-                yaml.safe_dump(customRule, f, sort_keys=False)  
+                all_custom_rules.update(customRule)
+                
+        final_output = {
+            "customRules": all_custom_rules
+        }
         
+        yaml.safe_dump(final_output, f, sort_keys=False, default_flow_style=False, indent=2)

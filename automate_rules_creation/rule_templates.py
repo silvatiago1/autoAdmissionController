@@ -87,10 +87,8 @@ def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_nam
     )
 
     return {
-        "customRules": {
             f"{name_prefix}detect-path-extraction-mnt-vol.yaml": LiteralStr(yaml_mounted_volume),
             f"{name_prefix}detect-path-extraction-arg-path.yaml": LiteralStr(yaml_argo_path),
-        }
     }
 
 def _build_container_rules_create_shared_block(namespace, name_prefix, extra_template_container, command, conf_args, rule_specific_condition, rule_specific_text):
@@ -146,8 +144,6 @@ def container_rules_create(namespace, name_prefix, extra_template_container, com
     )
 
     return {
-        "customRules": {
             f"{name_prefix}cmd-not-in-conf.yaml": LiteralStr(yaml_not_in_conf_cmds),
             f"{name_prefix}cmd-in-conf-not-args.yaml": LiteralStr(yaml_in_conf_cmds_not_args),
-        }
     }
