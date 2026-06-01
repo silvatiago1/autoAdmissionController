@@ -1,0 +1,7 @@
+customRules:
+  detect_wf_name.yaml: |
+    - rule: detect_wf_name
+      desc: Log everything from workflow with intended name
+      condition: k8s.ns.name = "argo" and k8s.pod.name startswith "suspend-template-" and k8s.pod.name contains "hello-world"
+      output: "Name detected: k8s_pod_name=%k8s.pod.name evt=%evt.type path=%fs.path.name rawname=%fs.path.nameraw source=%fs.path.source target=%fs.path.target parent=%proc.pcmdlinecontainer=%container.id evt_arg_flags=%evt.arg.flags"
+      priority: INFO
