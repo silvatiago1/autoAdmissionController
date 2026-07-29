@@ -1,0 +1,10 @@
+customRules:
+  data_path_prom.yaml: |
+    - rule: data_path_prom
+      desc: Detect unexpected writes or deletes in Prometheus TSDB data
+      condition: >
+        container and
+        (evt.type in (open,openat,openat2,rename,unlink,chmod,chown)) and
+        (fd.name contains "/prometheus/" or fd.name startswith "/var/lib/prometheus/")
+      output: Prometheus data path changed (file=%fd.name proc=%proc.name)
+      priority: WARNING
