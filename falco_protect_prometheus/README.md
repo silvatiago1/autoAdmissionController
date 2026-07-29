@@ -1,2 +1,0 @@
-This folder contains code for testing Falco's capabilities to protect Prometheus, it sits apart from the main code, as it is a side-note that
-shows how these techologies can interact with each other, while protecting the workflow.
