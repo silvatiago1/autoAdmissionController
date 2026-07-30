@@ -60,8 +60,8 @@ def _build_extraction_rule_shared_block(cmd_evt_flags, path, namespace, name_pre
 
 def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_name, extra_template_container):
     extra_pod_text=''
-    if(extra_template_container!=None):
-        extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'
+    if(False):#extra_template_container!=None
+        extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'#This had problems with normal zipslip to mounted path, thus was disabled, need to study further
     yaml_mounted_volume = _build_extraction_rule_shared_block(
         cmd_evt_flags=cmd_evt_flags,
         path=path,

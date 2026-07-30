@@ -31,11 +31,14 @@ helm upgrade --namespace falco falco falcosecurity/falco \
     --set falcoctl.artifact.follow.enabled=false \
     -f "$GENERATED_FILE"
 
-echo "Waiting for Falco pods to become Ready..."
-until kubectl wait pods --for=condition=Ready --all -n falco --timeout=60s; do
-    echo "Timed out waiting for pods. Retrying in 5 seconds..."
+echo "Waiting for Falco DaemonSet rollout to complete..."
+until kubectl rollout status daemonset/falco -n falco --timeout=60s; do
+    echo "Timed out waiting for rollout. Retrying in 5 seconds..."
     sleep 5
 done
+
+# Give the API server a brief moment to clean up references to dead pods
+sleep 2
 
 echo "Opening Falco logs window..."
 gnome-terminal --title="Falco Logs" -- bash -lc \
