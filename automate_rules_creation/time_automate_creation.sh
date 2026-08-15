@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-start_time=$(date +%s%N)
-
 set -euo pipefail
+
+start_time=$(date +%s%N)
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <input_file>"
@@ -40,17 +40,24 @@ done
 
 # Give the API server a brief moment to clean up references to dead pods
 sleep 2
+# Set benchmark_mode=1 to not open the GUI windows
+if [[ "${BENCHMARK_MODE:-0}" != "1" ]]; then
+    echo "Opening Falco logs window..."
+    gnome-terminal --title="Falco Logs" -- bash -lc \
+        'kubectl logs -f --tail=50 -l app.kubernetes.io/name=falco -n falco -c falco; exec bash' &
+fi
 
-echo "Opening Falco logs window..."
-gnome-terminal --title="Falco Logs" -- bash -lc \
-'kubectl logs -f --tail=50 -l app.kubernetes.io/name=falco -n falco -c falco; exec bash' &
-
-
-echo "Opening Argo workflow window..."
+echo "Submitting Argo workflow..."
 
 WORKFLOW_NAME=$(argo submit -n argo "$INPUT_FILE" -o name | sed 's#workflows.argoproj.io/##')
-gnome-terminal --title="Argo" -- bash -lc \
-    "argo watch -n argo \"$WORKFLOW_NAME\"; exec bash" &
+
+if [[ "${BENCHMARK_MODE:-0}" != "1" ]]; then
+    echo "Opening Argo workflow window..."
+    gnome-terminal --title="Argo" -- bash -lc \
+        "argo watch -n argo \"$WORKFLOW_NAME\"; exec bash" &
+fi
+
+echo "Submitted workflow: $WORKFLOW_NAME"
 
 echo "Submitted workflow: $WORKFLOW_NAME"
 
