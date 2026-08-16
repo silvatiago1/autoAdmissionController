@@ -1,0 +1,4 @@
+falco:
+  falco_yaml: |
+    rules_files:
+      - /etc/falco/rules.d

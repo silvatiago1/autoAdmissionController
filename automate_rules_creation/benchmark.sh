@@ -4,7 +4,7 @@ set -u
 
 SCRIPT="./time_automate_creation.sh"
 INPUT_FILE="$1"
-ITERATIONS=1000
+ITERATIONS=200
 
 benchmark_results_file="./benchmark_results.txt"
 

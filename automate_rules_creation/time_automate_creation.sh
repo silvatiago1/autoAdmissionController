@@ -63,6 +63,17 @@ echo "Submitted workflow: $WORKFLOW_NAME"
 
 
 end_time=$(date +%s%N)
+helm upgrade --namespace falco falco falcosecurity/falco \
+    --set tty=true \
+    --set falcoctl.artifact.install.enabled=false \
+    --set falcoctl.artifact.follow.enabled=false \
+    -f disable_rules.yaml
+until kubectl rollout status daemonset/falco -n falco --timeout=60s; do
+    echo "Timed out waiting for rollout. Retrying in 5 seconds..."
+    sleep 5
+done
+
+
 elapsed=$((end_time - start_time))
 
 echo "Terminating Argo workflow: $WORKFLOW_NAME"
