@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Read the numbers from the text files
-data1 = np.loadtxt("benchmark_workflow_times_artifacts_no_monitor.txt")
-data2 = np.loadtxt("benchmark_workflow_times_monitor_artifacts.txt")
+data1 = np.loadtxt("benchmark_workflow_times_no_monitor.txt")
+data2 = np.loadtxt("benchmark_workflow_times_zipslip_monitor.txt")
 
 # Create the violin plot
 plt.violinplot(
@@ -23,7 +23,7 @@ plt.ylabel("Time for the Pipeline to Run (ms)")
 plt.title("Violin Plot of Pipeline Run Times")
 
 plt.savefig(
-    "artifacts_workflow_run_violinplot.png",
+    "zipslip_workflow_run_violinplot.png",
     dpi=300,
     bbox_inches="tight"
 )

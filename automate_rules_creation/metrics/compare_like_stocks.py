@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 
 # Read values from the two files
-with open("ms_to_create_rules_artifact_passing.txt") as f:
+with open("ms_zipslip_creation.txt") as f:
     values1 = [float(line.strip()) for line in f if line.strip()]
 
-with open("benchmark_pipeline_times.txt") as f:
+with open("benchmark_results_zipslip_whole_process_untill_workflow_submitted.txt") as f:
     values2 = [float(line.strip()) for line in f if line.strip()]
 
 # Create the graph
