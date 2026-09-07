@@ -28,7 +28,7 @@ customRules:
       condition: fs.path.name contains "/mainctrfs/" or evt.arg.target contains "/mainctrfs/"
 
     - macro: in_pod
-      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
+      condition: k8s.pod.name startswith "artifact-passing-"
 
     - macro: link_path_artifacts
       condition: evt.arg.linkpath startswith "/argo/inputs/artifacts/"
@@ -58,7 +58,7 @@ customRules:
       condition: fs.path.name contains "/mainctrfs/" or evt.arg.target contains "/mainctrfs/"
 
     - macro: in_pod
-      condition: k8s.pod.name startswith "artifact-passing-" and k8s.pod.name contains "print-message-from-file"
+      condition: k8s.pod.name startswith "artifact-passing-"
 
     - macro: link_path_artifacts
       condition: evt.arg.linkpath startswith "/argo/inputs/artifacts/"

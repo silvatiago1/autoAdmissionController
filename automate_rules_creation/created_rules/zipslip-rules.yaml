@@ -7,7 +7,7 @@ customRules:
       condition: k8s.pod.name startswith "zipslip-" and k8s.pod.name contains "orange"
 
     - macro: conf_cmd_args
-      condition: proc.cmdline="sh -c echo 'Starting container'; sleep 3000"
+      condition: proc.cmdline="sh -c echo 'Starting container'"
 
     - rule: zipslip-detect-container-unconfigured-commands
       desc: Non-Argo default command/Non-Defined in yaml command detected

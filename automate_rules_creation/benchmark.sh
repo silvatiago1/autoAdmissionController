@@ -3,8 +3,36 @@
 set -u
 
 SCRIPT="./time_automate_creation.sh"
-INPUT_FILE="$1"
-ITERATIONS=200
+ITERATIONS=4
+FORWARD_FLAGS=""
+INPUT_FILE=""
+
+# Parse flags and collect extra flags to pass forward
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skip-apply|-s)
+            FORWARD_FLAGS="$FORWARD_FLAGS --skip-apply"
+            shift
+            ;;
+        --headless|-h)
+            FORWARD_FLAGS="$FORWARD_FLAGS --headless"
+            shift
+            ;;
+        --wait|-w)
+            FORWARD_FLAGS="$FORWARD_FLAGS --wait"
+            shift
+            ;;
+        *)
+            INPUT_FILE="$1"
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$INPUT_FILE" ]]; then
+    echo "Usage: $0 [--skip-apply|-s] [--headless|-h] [--wait|-w] <input_file>"
+    exit 1
+fi
 
 benchmark_results_file="./benchmark_results.txt"
 
@@ -17,7 +45,7 @@ echo
 for ((i=1; i<=ITERATIONS; i++)); do
     echo "Iteration $i/$ITERATIONS"
 
-    output=$(BENCHMARK_MODE=1 bash "$SCRIPT" "$INPUT_FILE" 2>&1)
+    output=$(bash "$SCRIPT" $FORWARD_FLAGS "$INPUT_FILE" 2>&1)
     status=$?
 
     echo "$output"
@@ -53,7 +81,6 @@ END {
     print "BENCHMARK RESULTS"
     print "========================================"
 
-    # Sort all values.
     for (i = 1; i <= n; i++) {
         sorted[i] = values[i]
     }
@@ -68,10 +95,6 @@ END {
         }
     }
 
-    # ============================================================
-    # ALL ITERATIONS
-    # ============================================================
-
     sum = 0
     max = values[1]
 
@@ -83,7 +106,6 @@ END {
     }
 
     mean = sum / n
-
     variance = 0
 
     for (i = 1; i <= n; i++)
@@ -109,13 +131,8 @@ END {
     printf "Maximum:       %.3f s\n", max / 1000
     printf "Std deviation: %.3f s\n", stddev / 1000
 
-    # ============================================================
-    # QUARTERS
-    # ============================================================
-
     quarter_size = int(n / 4)
 
-    # If there are fewer than 4 iterations, quarters do not make sense.
     if (quarter_size < 1) {
         print ""
         print "Not enough iterations for quarter statistics."
@@ -124,7 +141,6 @@ END {
     }
 
     for (q = 1; q <= 4; q++) {
-
         start = (q - 1) * quarter_size + 1
 
         if (q == 4)
@@ -134,7 +150,6 @@ END {
 
         count = end - start + 1
 
-        # Calculate sum and maximum.
         sum = 0
         max = values[start]
 
@@ -146,8 +161,6 @@ END {
         }
 
         mean = sum / count
-
-        # Standard deviation.
         variance = 0
 
         for (i = start; i <= end; i++)
@@ -155,11 +168,9 @@ END {
 
         stddev = sqrt(variance / count)
 
-        # Copy this quarter into a temporary array for median.
         for (i = 1; i <= count; i++)
             quarter[i] = values[start + i - 1]
 
-        # Sort quarter.
         for (i = 1; i <= count; i++) {
             for (j = i + 1; j <= count; j++) {
                 if (quarter[i] > quarter[j]) {
