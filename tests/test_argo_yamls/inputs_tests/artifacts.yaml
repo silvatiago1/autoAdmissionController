@@ -25,6 +25,7 @@ spec:
   - name: hello-world-to-file
     container:
       image: busybox
+      imagePullPolicy: IfNotPresent
       command: [sh, -c]
       args: ["echo hello world | tee /tmp/hello_world.txt"]
     outputs:
@@ -42,5 +43,6 @@ spec:
         path: /tmp/message
     container:
       image: alpine:3.23
+      imagePullPolicy: IfNotPresent
       command: [sh, -c]
       args: ["cat /tmp/message"]
