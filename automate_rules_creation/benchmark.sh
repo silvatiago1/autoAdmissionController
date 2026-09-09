@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#TODO: No RAM estou a captar do argo, prometheus, grafana, mas não vejo nada do Falco, ver melhor disso para saber bem o que é que estou a capturar
 set -u
 
 SCRIPT="./time_automate_creation.sh"

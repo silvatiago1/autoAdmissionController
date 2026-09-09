@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Prevent pipeline failures on SIGPIPE (Exit 141) while keeping safety checks
 set -eu
 set -o pipefail 2>/dev/null || true
 
@@ -10,8 +9,8 @@ WAIT_WORKFLOW=0
 DEACTIVATE_RULES=0
 INPUT_FILE=""
 
-# Initialize metric accumulators to prevent set -u unbound variable crashes
-pipeline_elapsed=0
+creation_elapsed=0
+apply_elapsed=0
 workflow_elapsed=0
 
 # Parse optional flags
@@ -47,91 +46,63 @@ if [[ -z "${INPUT_FILE:-}" ]]; then
     exit 1
 fi
 
-# Log file definitions
-PIPELINE_LOG="benchmark_pipeline_times.txt"
-WORKFLOW_LOG="benchmark_workflow_times.txt"
-TOTAL_LOG="benchmark_total_times.txt"
-MEMORY_SERIES_LOG="benchmark_workflow_memory_timeseries.csv"
+# Log file definitions (defaults if not set by wrapper)
+CREATION_LOG="${CREATION_LOG:-benchmark_rule_creation_times.txt}"
+APPLY_LOG="${APPLY_LOG:-benchmark_rule_apply_times.txt}"
+WORKFLOW_LOG="${WORKFLOW_LOG:-benchmark_workflow_times.txt}"
+MEMORY_SERIES_LOG="${MEMORY_SERIES_LOG:-benchmark_workflow_memory_timeseries.csv}"
 
-# Always ensure CSV log exists at start
 if [[ ! -f "$MEMORY_SERIES_LOG" ]]; then
     echo "timestamp_epoch_ms,pod_name,memory_bytes,memory_mib" > "$MEMORY_SERIES_LOG"
 fi
 
-# ==============================================================================
-# DEACTIVATION PHASE (Clears existing rules BEFORE starting the timer)
-# ==============================================================================
-if [[ "$SKIP_APPLY" -eq 0 ]]; then
-    echo "Deactivating previous Falco rules using disable_rules.yaml..."
-    
-    # Auto-cleanup stale helm release locks if present
-    STUCK_SECRET=$(kubectl get secrets -n falco -l "owner=helm,name=falco,status=pending-upgrade" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-    if [[ -n "$STUCK_SECRET" ]]; then
-        echo "Removing stale Helm upgrade lock: $STUCK_SECRET"
-        kubectl delete secret "$STUCK_SECRET" -n falco > /dev/null 2>&1 || true
-    fi
-
-    helm upgrade --namespace falco falco falcosecurity/falco \
-        --set tty=true \
-        --set falcoctl.artifact.install.enabled=false \
-        --set falcoctl.artifact.follow.enabled=false \
-        --atomic --timeout 30s \
-        -f disable_rules.yaml > /dev/null
-
-    echo "Waiting for rule deactivation rollout to complete..."
-    until kubectl rollout status daemonset/falco -n falco --timeout=60s > /dev/null 2>&1; do
-        echo "Timed out waiting for deactivation rollout. Retrying in 5 seconds..."
-        sleep 5
-    done
+# Initial helm lock cleanup helper
+STUCK_SECRET=$(kubectl get secrets -n falco -l "owner=helm,name=falco,status=pending-upgrade" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -n "$STUCK_SECRET" ]]; then
+    kubectl delete secret "$STUCK_SECRET" -n falco > /dev/null 2>&1 || true
 fi
 
 # ==============================================================================
-# PIPELINE TIMER START (Captures rule generation & deployment latency)
+# PHASE 1: RULE CREATION (Skipped completely if --deactivate-rules is active)
 # ==============================================================================
-if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
-    pipeline_start_time=$(date +%s%3N)
-fi
-
-echo "Running generator..."
-python3 main.py "$INPUT_FILE"
-
-# Find the newest generated rules file.
-GENERATED_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*.yaml" -print0 2>/dev/null \
-    | xargs -0 ls -t 2>/dev/null \
-    | head -n1 || true)
-
-if [[ -z "$GENERATED_FILE" || ! -f "$GENERATED_FILE" ]]; then
-    echo "Error: Could not find generated YAML file in ./created_rules"
-    exit 1
-fi
-
-# Determine which rules file to deploy
 if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
+    echo "Deactivate flag active: Skipping rule generation phase entirely."
     TARGET_RULES_FILE="disable_rules.yaml"
-    echo "Deactivate flag active: Deploying empty/disabled rules baseline ($TARGET_RULES_FILE)..."
+    creation_elapsed=0
 else
+    echo "Running rule generator..."
+    creation_start=$(date +%s%3N)
+    python3 main.py "$INPUT_FILE"
+    creation_end=$(date +%s%3N)
+    creation_elapsed=$((creation_end - creation_start))
+
+    GENERATED_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*.yaml" -print0 2>/dev/null \
+        | xargs -0 ls -t 2>/dev/null \
+        | head -n1 || true)
+
+    if [[ -z "$GENERATED_FILE" || ! -f "$GENERATED_FILE" ]]; then
+        echo "Error: Could not find generated YAML file in ./created_rules"
+        exit 1
+    fi
     TARGET_RULES_FILE="$GENERATED_FILE"
-    echo "Using generated rules file: $TARGET_RULES_FILE"
 fi
 
-# Bypass Helm, kubectl, and background execution if requested
+# Stop here if --skip-apply is set
 if [[ "$SKIP_APPLY" -eq 1 ]]; then
-    echo "Rule creation finished. Skipping deployment phase."
-    
-    if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
-        pipeline_end_time=$(date +%s%3N)
-        pipeline_elapsed=$((pipeline_end_time - pipeline_start_time))
-        
-        echo "$pipeline_elapsed" >> "$PIPELINE_LOG"
-        echo "$pipeline_elapsed" >> "$TOTAL_LOG"
-        
-        echo "Pipeline Elapsed: $pipeline_elapsed"
-        echo "Elapsed: $pipeline_elapsed"
+    if [[ "${BENCHMARK_MODE:-0}" -eq 1 && "$DEACTIVATE_RULES" -eq 0 ]]; then
+        echo "$creation_elapsed" >> "$CREATION_LOG"
+        echo "Rule Creation Elapsed: $creation_elapsed"
+        echo "Elapsed: $creation_elapsed"
     fi
     exit 0
 fi
 
-echo "Applying Helm upgrade with selected rules configuration..."
+# ==============================================================================
+# PHASE 2: MEASURE RULE APPLY TIME
+# ==============================================================================
+echo "Applying Helm upgrade with target configuration: $TARGET_RULES_FILE"
+apply_start=$(date +%s%3N)
+
 helm upgrade --namespace falco falco falcosecurity/falco \
     --set tty=true \
     --set falcoctl.artifact.install.enabled=false \
@@ -139,32 +110,24 @@ helm upgrade --namespace falco falco falcosecurity/falco \
     --atomic --timeout 30s \
     -f "$TARGET_RULES_FILE" > /dev/null
 
-echo "Waiting for Falco DaemonSet rollout to complete..."
 until kubectl rollout status daemonset/falco -n falco --timeout=60s > /dev/null 2>&1; do
-    echo "Timed out waiting for rollout. Retrying in 5 seconds..."
-    sleep 5
+    sleep 2
 done
+
+apply_end=$(date +%s%3N)
+apply_elapsed=$((apply_end - apply_start))
 
 # Brief delay to settle Kubernetes API references
 sleep 2
 
-# Stop pipeline timing here (before workflow starts execution)
-if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
-    pipeline_end_time=$(date +%s%3N)
-    pipeline_elapsed=$((pipeline_end_time - pipeline_start_time))
-fi
-
 # ==============================================================================
-# WORKFLOW EXECUTION & UNIVERSAL BACKGROUND MONITORING
+# PHASE 3: WORKFLOW EXECUTION & BACKGROUND MEMORY SAMPLING
 # ==============================================================================
-
-# Start universal memory collector in the background
 (
-    LOG_FILE="benchmark_workflow_memory_timeseries.csv"
     while true; do
         now_ms=$(date +%s%3N)
-        top_output=$(kubectl top pods -A --no-headers 2>/dev/null | grep -v -E "argo-workflows-server|workflow-controller|kube-system|falco" || true)
-        
+        # Filter specifically for Falco and Prometheus pods
+        top_output=$(kubectl top pods -A --no-headers 2>/dev/null | grep -E "falco|prometheus" | grep -v -E "operator|node-exporter|adapter" || true)
         if [[ -n "$top_output" ]]; then
             echo "$top_output" | while read -r line; do
                 pod_name=$(echo "$line" | awk '{print $2}')
@@ -187,7 +150,7 @@ fi
                 fi
 
                 if [[ -n "$pod_name" && "$mem_mib" -gt 0 ]]; then
-                    echo "${now_ms},${pod_name},${mem_bytes},${mem_mib}" >> "$LOG_FILE"
+                    echo "${now_ms},${pod_name},${mem_bytes},${mem_mib}" >> "$MEMORY_SERIES_LOG"
                 fi
             done
         fi
@@ -195,68 +158,36 @@ fi
     done
 ) &
 MONITOR_PID=$!
-
-# Ensure background monitor process is killed when the script terminates
 trap 'kill "$MONITOR_PID" 2>/dev/null || true' EXIT
 
-if [[ "$HEADLESS" -eq 1 ]]; then
-    echo "Headless mode enabled: Skipping gnome-terminal windows..."
-    
-    if [[ "$WAIT_WORKFLOW" -eq 1 ]]; then
-        echo "Submitting Argo workflow and waiting for completion..."
-        workflow_start_time=$(date +%s%3N)
-        
-        # Submit workflow and capture submission output to extract workflow name safely
-        SUBMIT_OUTPUT=$(argo submit -n argo "$INPUT_FILE" -o name 2>/dev/null || true)
-        
-        if [[ -n "$SUBMIT_OUTPUT" ]]; then
-            argo watch -n argo "$SUBMIT_OUTPUT" > /dev/null 2>&1 || true
-        else
-            # Fallback to watching @latest without SIGPIPE prone piping
-            argo watch -n argo @latest > /dev/null 2>&1 || true
-        fi
-        
-        workflow_end_time=$(date +%s%3N)
-        workflow_elapsed=$((workflow_end_time - workflow_start_time))
-    else
-        echo "Submitting Argo workflow in the background..."
-        argo submit -n argo "$INPUT_FILE" > /dev/null 2>&1 &
-    fi
+echo "Submitting Argo workflow..."
+workflow_start=$(date +%s%3N)
+
+SUBMIT_OUTPUT=$(argo submit -n argo "$INPUT_FILE" -o name 2>/dev/null || true)
+if [[ -n "$SUBMIT_OUTPUT" ]]; then
+    argo watch -n argo "$SUBMIT_OUTPUT" > /dev/null 2>&1 || true
 else
-    echo "Opening Falco logs window..."
-    gnome-terminal --title="Falco Logs" -- bash -lc \
-    'kubectl logs -f --tail=50 -l app.kubernetes.io/name=falco -n falco -c falco; exec bash' &
-
-    echo "Opening Argo workflow window..."
-    if [[ "$WAIT_WORKFLOW" -eq 1 ]]; then
-        workflow_start_time=$(date +%s%3N)
-        gnome-terminal --wait --title="Argo" -- bash -lc \
-        "argo submit -n argo --watch \"$INPUT_FILE\""
-        workflow_end_time=$(date +%s%3N)
-        workflow_elapsed=$((workflow_end_time - workflow_start_time))
-    else
-        gnome-terminal --title="Argo" -- bash -lc \
-        "argo submit -n argo --watch \"$INPUT_FILE\"; exec bash" &
-    fi
-
-    echo "Workflow submission finished."
+    argo watch -n argo @latest > /dev/null 2>&1 || true
 fi
 
+workflow_end=$(date +%s%3N)
+workflow_elapsed=$((workflow_end - workflow_start))
+
 # ==============================================================================
-# METRICS FILE WRITING & CONSOLE OUTPUT
+# LOG OUTPUTS FOR BENCHMARKING
 # ==============================================================================
 if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
-    total_elapsed=$((pipeline_elapsed + workflow_elapsed))
-    
-    echo "$pipeline_elapsed" >> "$PIPELINE_LOG"
-    echo "$total_elapsed" >> "$TOTAL_LOG"
-    
-    echo "Pipeline Elapsed: $pipeline_elapsed"
-    
-    if [[ "$WAIT_WORKFLOW" -eq 1 ]]; then
-        echo "$workflow_elapsed" >> "$WORKFLOW_LOG"
-        echo "Workflow Elapsed: $workflow_elapsed"
+    if [[ "$DEACTIVATE_RULES" -eq 0 ]]; then
+        echo "$creation_elapsed" >> "$CREATION_LOG"
+        echo "Rule Creation Elapsed: $creation_elapsed"
     fi
     
+    echo "$apply_elapsed" >> "$APPLY_LOG"
+    echo "$workflow_elapsed" >> "$WORKFLOW_LOG"
+    
+    echo "Rule Apply Elapsed: $apply_elapsed"
+    echo "Workflow Elapsed: $workflow_elapsed"
+    
+    total_elapsed=$((creation_elapsed + apply_elapsed + workflow_elapsed))
     echo "Elapsed: $total_elapsed"
 fi

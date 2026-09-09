@@ -1,10 +1,10 @@
 customRules:
-  zipslip-orange-cmd-in-conf-not-args.yaml: |
+  zipslip-main-cmd-in-conf-not-args.yaml: |
     - macro: conf_cmd
       condition: proc.name="sh"
 
     - macro: in_pod
-      condition: k8s.pod.name startswith "zipslip-" and k8s.pod.name contains "orange"
+      condition: k8s.pod.name startswith "zipslip-" and k8s.pod.name contains "main"
 
     - macro: conf_cmd_args
       condition: proc.cmdline="sh -c echo 'Starting container'"
@@ -14,7 +14,7 @@ customRules:
       condition: conf_cmd and not conf_cmd_args and k8s.ns.name = "argo" and in_pod
       output: "Detected unknown args in configured command | user=%user.name command_name=%proc.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING
-  zipslip-orange-detect-path-extraction-mnt-vol.yaml: |
+  zipslip-main-detect-path-extraction-mnt-vol.yaml: |
     - macro: cmd_events_flags
       condition: >
         (proc.cmdline startswith "argoexec init" and
@@ -44,7 +44,7 @@ customRules:
       condition: ((cmd_events_flags and (not file_path) and not benign_files) or (create_symlink and link_path_artifacts and wrong_target)) and k8s.ns.name = "argo" and in_pod and proc.cmdline startswith "argoexec init" and in_mainctrfs
       output: "File extraction outside of the intended path, to a mounted volume's path, /work/tmp | user=%user.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
       priority: WARNING
-  zipslip-orange-detect-path-extraction-arg-path.yaml: |
+  zipslip-main-detect-path-extraction-arg-path.yaml: |
     - macro: cmd_events_flags
       condition: >
         (proc.cmdline startswith "argoexec init" and
