@@ -1,26 +1,40 @@
+import json
 from textwrap import dedent
 import yaml
+
 
 class LiteralStr(str):
     pass
 
+
 def represent_literal_str(dumper, data):
     return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
+
 yaml.add_representer(LiteralStr, represent_literal_str)
 yaml.SafeDumper.add_representer(LiteralStr, represent_literal_str)
+
 
 def _indent(text, n=4):
     pad = " " * n
     return "\n".join(pad + line if line else line for line in text.splitlines())
 
-def _build_extraction_rule_shared_block(cmd_evt_flags, path, namespace, name_prefix, art_name, mainctrfs_condition, rule_suffix, output_suffix, extra_pod_text):
+
+def _build_extraction_rule_shared_block(
+    cmd_evt_flags,
+    path,
+    namespace,
+    name_prefix,
+    art_name,
+    mainctrfs_condition,
+    rule_suffix,
+    output_suffix,
+    extra_pod_text,
+):
     proc_name = cmd_evt_flags["command"][0]
     evt_type = cmd_evt_flags["events"]["items"][0]
     flags = cmd_evt_flags["flags"]["items"]
 
-    # Construct the condition strings
-    # Joining flags with 'and' for the macro
     flags_condition = " and ".join([f"evt.arg.flags contains {f}" for f in flags])
     macro_cmd_events = dedent(f"""\
 (proc.cmdline startswith "{proc_name}" and
@@ -58,10 +72,16 @@ def _build_extraction_rule_shared_block(cmd_evt_flags, path, namespace, name_pre
           priority: WARNING
     """)
 
-def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_name, extra_template_container):
-    extra_pod_text=''
-    if(False):#extra_template_container!=None
-        extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'#This had problems with normal zipslip to mounted path, thus was disabled, need to study further
+
+def extraction_rules_create(
+    cmd_evt_flags,
+    path,
+    namespace,
+    name_prefix,
+    art_name,
+    extra_template_container,
+):
+    extra_pod_text = ""
     yaml_mounted_volume = _build_extraction_rule_shared_block(
         cmd_evt_flags=cmd_evt_flags,
         path=path,
@@ -87,13 +107,27 @@ def extraction_rules_create(cmd_evt_flags, path, namespace, name_prefix, art_nam
     )
 
     return {
-            f"{name_prefix}{extra_template_container}-detect-path-extraction-mnt-vol.yaml": LiteralStr(yaml_mounted_volume),
-            f"{name_prefix}{extra_template_container}-detect-path-extraction-arg-path.yaml": LiteralStr(yaml_argo_path),
+        f"{name_prefix}{extra_template_container}-detect-path-extraction-mnt-vol.yaml": LiteralStr(
+            yaml_mounted_volume
+        ),
+        f"{name_prefix}{extra_template_container}-detect-path-extraction-arg-path.yaml": LiteralStr(
+            yaml_argo_path
+        ),
     }
 
-def _build_container_rules_create_shared_block(namespace, name_prefix, extra_template_container, command_name, non_argo_cmd, conf_cmd_args, rule_specific_condition, rule_specific_text):
-    extra_pod_text=''
-    if(extra_template_container!=None):
+
+def _build_container_rules_create_shared_block(
+    namespace,
+    name_prefix,
+    extra_template_container,
+    command_name,
+    non_argo_cmd,
+    conf_cmd_args,
+    rule_specific_condition,
+    rule_specific_text,
+):
+    extra_pod_text = ""
+    if extra_template_container != None:
         extra_pod_text = f' and k8s.pod.name contains "{extra_template_container}"'
     return dedent(f"""\
         - macro: conf_cmd
@@ -109,31 +143,28 @@ def _build_container_rules_create_shared_block(namespace, name_prefix, extra_tem
           priority: WARNING
     """)
 
-def container_rules_create(namespace, name_prefix, extra_template_container, command_name, command, args):
-    '''conf_cmd_args =
-    non_argo_cmd=
-        - macro: non_argo_command
-          condition: proc.name exists and not proc.name in (argoexec, pause, workflow-contro) and not proc.name startswith runc
-{conf_cmd_args}
-    rule_specific_condition = 'non_argo_command and not conf_cmd'
-    rule_specific_text = 'Detected non-configured command'
-    yaml_not_in_conf_cmds = _build_container_rules_create_shared_block(
-        namespace,
-        name_prefix,
-        extra_template_container,
-        command,
-        non_argo_cmd,
-        conf_cmd_args,
-        rule_specific_condition,
-        rule_specific_text,
-    )'''
-    non_argo_cmd=''
-    conf_cmd_args = f'''
+
+def container_rules_create(
+    namespace,
+    name_prefix,
+    extra_template_container,
+    command_name,
+    command,
+    args,
+):
+    non_argo_cmd = ""
+
+    # Safely format multiline shell commands and escape inner quotes using json.dumps
+    full_cmd_str = f"{command} {args}".strip()
+    escaped_cmdline = json.dumps(full_cmd_str)
+
+    conf_cmd_args = f"""
         - macro: conf_cmd_args
-          condition: proc.cmdline="{command} {args}"
-'''
-    rule_specific_condition = 'conf_cmd and not conf_cmd_args'
-    rule_specific_text = 'Detected unknown args in configured command'
+          condition: proc.cmdline={escaped_cmdline}
+"""
+    rule_specific_condition = "conf_cmd and not conf_cmd_args"
+    rule_specific_text = "Detected unknown args in configured command"
+
     yaml_in_conf_cmds_not_args = _build_container_rules_create_shared_block(
         namespace,
         name_prefix,
@@ -146,6 +177,7 @@ def container_rules_create(namespace, name_prefix, extra_template_container, com
     )
 
     return {
-            #f"{name_prefix}{extra_template_container}-cmd-not-in-conf.yaml": LiteralStr(yaml_not_in_conf_cmds),
-            f"{name_prefix}{extra_template_container}-cmd-in-conf-not-args.yaml": LiteralStr(yaml_in_conf_cmds_not_args),
+        f"{name_prefix}{extra_template_container}-cmd-in-conf-not-args.yaml": LiteralStr(
+            yaml_in_conf_cmds_not_args
+        ),
     }
