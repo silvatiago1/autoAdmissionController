@@ -30,12 +30,16 @@ run_test_suite_for_file() {
     echo " Required Iterations: $ITERATIONS"
     echo "=================================================================="
 
+    # Target Metric Output Files
     export CREATION_LOG="${target_dir}/${base_name}_rule_creation_times_ms.txt"
     export WORKFLOW_ACTIVE_LOG="${target_dir}/${base_name}_workflow_active_rules_times_ms.txt"
     export WORKFLOW_INACTIVE_LOG="${target_dir}/${base_name}_workflow_inactive_rules_times_ms.txt"
     export APPLY_ACTIVE_LOG="${target_dir}/${base_name}_rule_apply_active_times_ms.txt"
     export APPLY_INACTIVE_LOG="${target_dir}/${base_name}_rule_apply_inactive_times_ms.txt"
-    export MEMORY_SERIES_LOG="${target_dir}/${base_name}_ram_usage_timeseries.csv"
+    
+    # SEPARATED RAM LOGS FOR ACTIVE VS INACTIVE
+    export MEMORY_ACTIVE_SERIES_LOG="${target_dir}/${base_name}_ram_usage_active_timeseries.csv"
+    export MEMORY_INACTIVE_SERIES_LOG="${target_dir}/${base_name}_ram_usage_inactive_timeseries.csv"
 
     get_line_count() {
         local file="$1"
@@ -46,8 +50,8 @@ run_test_suite_for_file() {
         fi
     }
 
-    # 1. RUN CREATION & ACTIVE RULES BENCHMARKS (Falco + Prometheus Active)
-    echo "--> Benchmarking Falco & Prometheus Rule Creation, Application, and Workflow..."
+    # 1. RUN CREATION & ACTIVE RULES BENCHMARKS
+    echo "--> Benchmarking Rule Creation, Application, and Active Workflow..."
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_ACTIVE_LOG")
         if [[ "$current_lines" -ge "$ITERATIONS" ]]; then
@@ -58,6 +62,7 @@ run_test_suite_for_file() {
         echo "Running iteration $((current_lines + 1))/$ITERATIONS for Active Rules..."
         export WORKFLOW_LOG="$WORKFLOW_ACTIVE_LOG"
         export APPLY_LOG="$APPLY_ACTIVE_LOG"
+        export MEMORY_SERIES_LOG="$MEMORY_ACTIVE_SERIES_LOG"
         
         ./automate_creation.sh -h -w "$target_file" || {
             echo "Execution failed. Retrying iteration..."
@@ -66,7 +71,7 @@ run_test_suite_for_file() {
         }
     done
 
-    # 2. RUN WORKFLOW WITH RULES DEACTIVATED (Falco + Prometheus Inactive)
+    # 2. RUN WORKFLOW WITH RULES DEACTIVATED
     echo "--> Benchmarking Workflow Runtime with Rules DEACTIVATED..."
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_INACTIVE_LOG")
@@ -78,6 +83,7 @@ run_test_suite_for_file() {
         echo "Running iteration $((current_lines + 1))/$ITERATIONS for Inactive Rules..."
         export WORKFLOW_LOG="$WORKFLOW_INACTIVE_LOG"
         export APPLY_LOG="$APPLY_INACTIVE_LOG"
+        export MEMORY_SERIES_LOG="$MEMORY_INACTIVE_SERIES_LOG"
         
         ./automate_creation.sh -h -w -d "$target_file" || {
             echo "Execution failed. Retrying iteration..."
