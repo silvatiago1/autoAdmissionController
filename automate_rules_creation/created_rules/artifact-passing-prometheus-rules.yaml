@@ -26,15 +26,6 @@ spec:
         summary: "High Memory usage"
         description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is exceeding 85% of memory limit (256Mi)."
 
-    - alert: ArtifactPassingHelloWorldToFileHighPodEphemeralStorageUsage
-      expr: |
-        container_fs_usage_bytes{namespace="argo", pod=~"artifact-passing-.*hello-world-to-file.*"} > 456340275
-      labels:
-        severity: warning
-      annotations:
-        summary: "High Ephemeral Storage usage"
-        description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is exceeding 85% of ephemeral storage limit (512Mi)."
-
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -63,14 +54,5 @@ spec:
       annotations:
         summary: "High Memory usage"
         description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is exceeding 85% of memory limit (256Mi)."
-
-    - alert: ArtifactPassingPrintMessageFromFileHighPodEphemeralStorageUsage
-      expr: |
-        container_fs_usage_bytes{namespace="argo", pod=~"artifact-passing-.*print-message-from-file.*"} > 456340275
-      labels:
-        severity: warning
-      annotations:
-        summary: "High Ephemeral Storage usage"
-        description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is exceeding 85% of ephemeral storage limit (512Mi)."
 
 ---

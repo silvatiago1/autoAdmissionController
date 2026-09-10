@@ -5,7 +5,7 @@ set -o pipefail 2>/dev/null || true
 
 if [[ $# -lt 3 ]]; then
     echo "Usage: $0 <iterations> <file_1.yaml> <file_2.yaml> [output_directory]"
-    echo "Example: $0 5 workflow_a.yaml workflow_b.yaml ./metrics/benchmark_results"
+    echo "Example: $0 5 workflow_a.yaml workflow_b.yaml ./benchmark_results"
     exit 1
 fi
 
@@ -30,7 +30,6 @@ run_test_suite_for_file() {
     echo " Required Iterations: $ITERATIONS"
     echo "=================================================================="
 
-    # Target Metric Output Files
     export CREATION_LOG="${target_dir}/${base_name}_rule_creation_times_ms.txt"
     export WORKFLOW_ACTIVE_LOG="${target_dir}/${base_name}_workflow_active_rules_times_ms.txt"
     export WORKFLOW_INACTIVE_LOG="${target_dir}/${base_name}_workflow_inactive_rules_times_ms.txt"
@@ -47,8 +46,8 @@ run_test_suite_for_file() {
         fi
     }
 
-    # 1. RUN CREATION & ACTIVE RULES BENCHMARKS
-    echo "--> Benchmarking Rule Creation, Application, and Active Workflow..."
+    # 1. RUN CREATION & ACTIVE RULES BENCHMARKS (Falco + Prometheus Active)
+    echo "--> Benchmarking Falco & Prometheus Rule Creation, Application, and Workflow..."
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_ACTIVE_LOG")
         if [[ "$current_lines" -ge "$ITERATIONS" ]]; then
@@ -67,8 +66,8 @@ run_test_suite_for_file() {
         }
     done
 
-    # 2. RUN WORKFLOW WITH RULES DEACTIVATED (Skips Rule Creation)
-    echo "--> Benchmarking Workflow Runtime with Rules DEACTIVATED (Creation Skipped)..."
+    # 2. RUN WORKFLOW WITH RULES DEACTIVATED (Falco + Prometheus Inactive)
+    echo "--> Benchmarking Workflow Runtime with Rules DEACTIVATED..."
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_INACTIVE_LOG")
         if [[ "$current_lines" -ge "$ITERATIONS" ]]; then
@@ -80,7 +79,6 @@ run_test_suite_for_file() {
         export WORKFLOW_LOG="$WORKFLOW_INACTIVE_LOG"
         export APPLY_LOG="$APPLY_INACTIVE_LOG"
         
-        # -d flag deactivates rules and skips main.py rule generation
         ./automate_creation.sh -h -w -d "$target_file" || {
             echo "Execution failed. Retrying iteration..."
             sleep 3
@@ -92,7 +90,6 @@ run_test_suite_for_file() {
     echo ""
 }
 
-# Run benchmark suites for both input files
 run_test_suite_for_file "$FILE_1"
 run_test_suite_for_file "$FILE_2"
 

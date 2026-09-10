@@ -10,7 +10,7 @@ spec:
     rules:
     - alert: ZipslipMainHighPodCpuUsage
       expr: |
-        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"zipslip-.*main.*"}[30s]) * 10 > 0.003
+        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"zipslip-.*main.*"}[30s]) * 10 > 4.25
       labels:
         severity: warning
       annotations:
@@ -19,7 +19,7 @@ spec:
 
     - alert: ZipslipMainHighPodMemoryUsage
       expr: |
-        container_memory_working_set_bytes{namespace="argo", pod=~"zipslip-.*main.*"} > 10
+        container_memory_working_set_bytes{namespace="argo", pod=~"zipslip-.*main.*"} > 228170137
       labels:
         severity: warning
       annotations:
