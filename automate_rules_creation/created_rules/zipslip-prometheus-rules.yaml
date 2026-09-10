@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zipslip--main-cpu-rules
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: zipslip--main-k8s-pod-resources
+    rules:
+    - alert: ZipslipMainHighPodCpuUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"zipslip-.*main.*"}[30s]) * 10 > 0.003
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "Pod matching regex 'zipslip-.*main.*' in namespace argo is using more than 4.25 CPU 100ms units (85% of limit 500m)."
+
+    - alert: ZipslipMainHighPodMemoryUsage
+      expr: |
+        container_memory_working_set_bytes{namespace="argo", pod=~"zipslip-.*main.*"} > 10
+      labels:
+        severity: warning
+      annotations:
+        summary: "High Memory usage"
+        description: "Pod matching regex 'zipslip-.*main.*' in namespace argo is exceeding 85% of memory limit (256Mi)."
+
+---

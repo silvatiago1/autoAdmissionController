@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: resource-limited-demo--main-cpu-rules
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: resource-limited-demo--main-k8s-pod-resources
+    rules:
+    - alert: ResourceLimitedDemoMainHighPodCpuUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"resource-limited-demo-.*main.*"}[30s]) * 10 > 4.25
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "Pod matching regex 'resource-limited-demo-.*main.*' in namespace argo is using more than 4.25 CPU 100ms units (85% of limit 500m)."
+
+    - alert: ResourceLimitedDemoMainHighPodMemoryUsage
+      expr: |
+        container_memory_working_set_bytes{namespace="argo", pod=~"resource-limited-demo-.*main.*"} > 228170137
+      labels:
+        severity: warning
+      annotations:
+        summary: "High Memory usage"
+        description: "Pod matching regex 'resource-limited-demo-.*main.*' in namespace argo is exceeding 85% of memory limit (256Mi)."
+
+---

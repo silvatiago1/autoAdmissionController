@@ -1,0 +1,19 @@
+customRules:
+  resource-limited-demo-main-cmd-in-conf-not-args.yaml: |2
+            - macro: conf_cmd
+              condition: proc.name="sh"
+
+            - macro: in_pod
+              condition: k8s.pod.name startswith "resource-limited-demo-" and k8s.pod.name contains "main"
+
+            - macro: conf_cmd_args
+              condition: proc.cmdline="sh -c set -eux
+    echo "hello from argo" > /work/output.txt
+    cat /work/output.txt
+    "
+
+            - rule: resource-limited-demo-detect-container-unconfigured-commands
+              desc: Non-Argo default command/Non-Defined in yaml command detected
+              condition: conf_cmd and not conf_cmd_args and k8s.ns.name = "argo" and in_pod
+              output: "Detected unknown args in configured command | user=%user.name command_name=%proc.name command=%proc.cmdline file=%fd.name file_source=%fs.path.source file_target=%fs.path.target linkpath=%evt.arg.linkpath target=%evt.arg.target evt_type=%evt.type evt_arg_flags=%evt.arg.flags"
+              priority: WARNING

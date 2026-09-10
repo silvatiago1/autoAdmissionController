@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from prometheus_utils import prometheus_rules_create
 from pathlib import Path
 from typing import Any, Dict
 from collections.abc import Mapping
@@ -75,25 +76,48 @@ def build_fields_rule(
     """
     Receives a template's field section of an Argo template, and creates a Falco rule based on that.
     """
-    if(field[0]!="container"):
-        field_specs= load_field_specs(field, spec_dir)
+    if field[0] != "container":
+        field_specs = load_field_specs(field, spec_dir)
         cmd_evt_flags = matched_specs(field_specs, field)
-        
+
     key = list(field[1].keys())[0]
 
     # Extract path, if it exists
-    if('path' in field[1][key][0]):
-        extraction_path = (field[1])[key][0]['path']
-        art_name = (field[1])[key][0]['name']
-    
+    if "path" in field[1][key][0]:
+        extraction_path = (field[1])[key][0]["path"]
+        art_name = (field[1])[key][0]["name"]
+
     field_type = field[0]
     match field_type:
         case "container":
             command_name = field[1]["command"][0]
             command = " ".join(field[1]["command"])
-            args = " ".join(field[1]["args"])
-            return container_rules_create(namespace, name_prefix, extra_template_container, command_name, command, args)
+            args = " ".join(field[1]["args"]) if "args" in field[1] else ""
+
+            falco_rules = container_rules_create(
+                namespace,
+                name_prefix,
+                extra_template_container,
+                command_name,
+                command,
+                args,
+            )
+            prom_rules = prometheus_rules_create(
+                field[1].get("resources", {}),
+                namespace,
+                name_prefix,
+                extra_template_container,
+            )
+            
+            return {**falco_rules, **prom_rules}
         case "inputs":
-            return extraction_rules_create(cmd_evt_flags[0], extraction_path, namespace, name_prefix, art_name, extra_template_container)
+            return extraction_rules_create(
+                cmd_evt_flags[0],
+                extraction_path,
+                namespace,
+                name_prefix,
+                art_name,
+                extra_template_container,
+            )
         case _:
             return "Error, field type not configured"
