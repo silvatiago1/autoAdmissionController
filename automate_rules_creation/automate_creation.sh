@@ -66,9 +66,8 @@ fi
 # PHASE 1: RULE CREATION (Falco & Prometheus)
 # ==============================================================================
 if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
-    echo "Deactivate flag active: Skipping rule generation phase entirely."
-    TARGET_FALCO_RULES_FILE="disable_rules.yaml"
-    TARGET_PROM_RULES_FILE=""
+    echo "Deactivate flag active: Generating rules (untimed) so they can be applied prior to testing deactivation..."
+    python3 main.py "$INPUT_FILE" > /dev/null 2>&1 || true
     creation_elapsed=0
 else
     echo "Running rule generator for Falco and Prometheus..."
@@ -76,25 +75,25 @@ else
     python3 main.py "$INPUT_FILE"
     creation_end=$(date +%s%3N)
     creation_elapsed=$((creation_end - creation_start))
+fi
 
-    # Detect Falco rule file
-    TARGET_FALCO_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f \( -name "*falco*.yaml" -o -name "*.yaml" \) ! -name "*prometheus*" -print0 2>/dev/null \
-        | xargs -0 ls -t 2>/dev/null \
-        | head -n1 || true)
+# Detect Falco rule file
+TARGET_FALCO_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f \( -name "*falco*.yaml" -o -name "*.yaml" \) ! -name "*prometheus*" -print0 2>/dev/null \
+    | xargs -0 ls -t 2>/dev/null \
+    | head -n1 || true)
 
-    # Detect Prometheus rule file (e.g., zipslip-prometheus-rules.yaml)
-    TARGET_PROM_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*prometheus*.yaml" -print0 2>/dev/null \
-        | xargs -0 ls -t 2>/dev/null \
-        | head -n1 || true)
+# Detect Prometheus rule file (e.g., zipslip-prometheus-rules.yaml)
+TARGET_PROM_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*prometheus*.yaml" -print0 2>/dev/null \
+    | xargs -0 ls -t 2>/dev/null \
+    | head -n1 || true)
 
-    if [[ -z "$TARGET_FALCO_RULES_FILE" || ! -f "$TARGET_FALCO_RULES_FILE" ]]; then
-        echo "Error: Could not find generated Falco YAML file in ./created_rules"
-        exit 1
-    fi
+if [[ -z "$TARGET_FALCO_RULES_FILE" || ! -f "$TARGET_FALCO_RULES_FILE" ]]; then
+    echo "Error: Could not find generated Falco YAML file in ./created_rules"
+    exit 1
+fi
 
-    if [[ -z "$TARGET_PROM_RULES_FILE" || ! -f "$TARGET_PROM_RULES_FILE" ]]; then
-        echo "Warning: Could not find generated Prometheus YAML file in ./created_rules"
-    fi
+if [[ -z "$TARGET_PROM_RULES_FILE" || ! -f "$TARGET_PROM_RULES_FILE" ]]; then
+    echo "Warning: Could not find generated Prometheus YAML file in ./created_rules"
 fi
 
 # Stop here if --skip-apply is set
@@ -108,14 +107,12 @@ if [[ "$SKIP_APPLY" -eq 1 ]]; then
 fi
 
 # ==============================================================================
-# PHASE 2: MEASURE RULE APPLY / DEACTIVATE TIME
+# HELPER FUNCTIONS FOR RULE MANAGEMENT
 # ==============================================================================
-apply_start=$(date +%s%3N)
-
-if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
-    echo "Deactivating Falco & Prometheus rules..."
+deactivate_all_rules() {
+    echo "Deactivating existing Falco & Prometheus rules..."
     
-    # 1. Deactivate Falco Rules (Helm reset)
+    # 1. Deactivate Falco Rules (Helm reset to default/disabled state)
     helm upgrade --namespace falco falco falcosecurity/falco \
         --set tty=true \
         --set falcoctl.artifact.install.enabled=false \
@@ -127,17 +124,17 @@ if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
         sleep 2
     done
 
-    # 2. Deactivate Prometheus Rules (Delete PrometheusRule CRD)
+    # 2. Deactivate Prometheus Rules (Delete existing PrometheusRule CRDs)
     PROM_FILES=$(find ./created_rules -maxdepth 1 -type f -name "*prometheus*.yaml" 2>/dev/null || true)
     if [[ -n "$PROM_FILES" ]]; then
         for pf in $PROM_FILES; do
             kubectl delete -f "$pf" --ignore-not-found=true > /dev/null 2>&1 || true
         done
     fi
-    # Delete any lingering custom prometheus rules
     kubectl delete prometheusrule --all -A --ignore-not-found=true > /dev/null 2>&1 || true
+}
 
-else
+apply_active_rules() {
     echo "Applying active rules:"
     echo " - Falco: $TARGET_FALCO_RULES_FILE"
     echo " - Prometheus: ${TARGET_PROM_RULES_FILE:-None found}"
@@ -158,10 +155,32 @@ else
     if [[ -n "${TARGET_PROM_RULES_FILE:-}" && -f "$TARGET_PROM_RULES_FILE" ]]; then
         kubectl apply -f "$TARGET_PROM_RULES_FILE" > /dev/null
     fi
-fi
+}
 
-apply_end=$(date +%s%3N)
-apply_elapsed=$((apply_end - apply_start))
+# ==============================================================================
+# PHASE 2: MEASURE RULE APPLY / DEACTIVATE TIME
+# ==============================================================================
+if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
+    # 1. Untimed pre-application step so rules are active before testing deactivation
+    apply_active_rules
+
+    # 2. Start timer strictly for deactivating rules
+    apply_start=$(date +%s%3N)
+    deactivate_all_rules
+    apply_end=$(date +%s%3N)
+    
+    apply_elapsed=$((apply_end - apply_start))
+else
+    # 1. Untimed pre-deactivation step to ensure a clean cluster state
+    deactivate_all_rules
+
+    # 2. Start timer strictly for applying new active rules
+    apply_start=$(date +%s%3N)
+    apply_active_rules
+    apply_end=$(date +%s%3N)
+    
+    apply_elapsed=$((apply_end - apply_start))
+fi
 
 sleep 2
 
@@ -230,7 +249,7 @@ if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
     echo "$apply_elapsed" >> "$APPLY_LOG"
     echo "$workflow_elapsed" >> "$WORKFLOW_LOG"
     
-    echo "Rule Apply Elapsed: $apply_elapsed"
+    echo "Rule Apply/Deactivate Elapsed: $apply_elapsed"
     echo "Workflow Elapsed: $workflow_elapsed"
     
     total_elapsed=$((creation_elapsed + apply_elapsed + workflow_elapsed))

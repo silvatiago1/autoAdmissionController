@@ -12,7 +12,8 @@ fi
 ITERATIONS="$1"
 FILE_1="$2"
 FILE_2="$3"
-BASE_OUT_DIR="${4:-./benchmark_results}"
+FILE_3="$4"
+BASE_OUT_DIR="${5:-./benchmark_results}"
 
 export BENCHMARK_MODE=1
 
@@ -98,6 +99,7 @@ run_test_suite_for_file() {
 
 run_test_suite_for_file "$FILE_1"
 run_test_suite_for_file "$FILE_2"
+run_test_suite_for_file "$FILE_3"
 
 echo "=================================================================="
 echo " All Benchmarks Completed Successfully!"

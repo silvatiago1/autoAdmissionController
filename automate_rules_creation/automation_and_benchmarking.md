@@ -1,4 +1,8 @@
-Metrics were done with the help of Gemini
+Metrics code and documentation were done with the help of Gemini
+
+Before capturing metrics, ensure that the metrics server is running, you may use:
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
 
 # Falco Rule Generator & Automated Deployment Pipeline
 
