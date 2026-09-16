@@ -44,11 +44,29 @@ minikube tunnel
 ### Test if Minio is working
 kubectl get svc -n argo argo-artifacts
 
-kubectl run -n argo mc --image=minio/mc --restart=Never --command -- sleep 3600
-kubectl exec -n argo -it mc -- mc alias set local http://argo-artifacts.argo.svc.cluster.local:9000 minioadmin minioadmin
-kubectl exec -n argo -it mc -- mc admin info local
+kubectl run -n argo mc \
+  --image=quay.io/minio/mc \
+  --restart=Never \
+  --command -- \
+  sleep 3600kubectl exec -n argo -it mc -- mc admin info local
+  
 kubectl exec -n argo -it mc -- mc mb local/my-bucket
 kubectl exec -n argo -it mc -- mc ls local
+
+### Place tgz in my-bucket
+kubectl exec -n argo mc -- sh -c 'cat > /tmp/etc-poc.tgz' < etc-poc.tgz
+kubectl exec -n argo mc -- sh -c 'cat > /tmp/normal-poc.tgz' < normal-poc.tgz
+kubectl exec -n argo mc -- sh -c 'cat > /tmp/output.tar.gz' < output.tar.gz
+kubectl exec -n argo mc -- sh -c 'cat > /tmp/symlink_bananas.tar.gz' < symlink_bananas.tar.gz
+
+kubectl exec -n argo mc -- \
+  mc cp /tmp/etc-poc.tgz local/my-bucket/
+kubectl exec -n argo mc -- \
+  mc cp /tmp/normal-poc.tgz local/my-bucket/
+kubectl exec -n argo mc -- \
+  mc cp /tmp/output.tar.gz local/my-bucket/
+kubectl exec -n argo mc -- \
+  mc cp /tmp/symlink_bananas.tar.gz local/my-bucket/
 
 # Falco
 helm install --replace falco --namespace falco --create-namespace --set tty=true falcosecurity/falco
