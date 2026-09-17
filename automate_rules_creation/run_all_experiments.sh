@@ -5,7 +5,7 @@ set -o pipefail 2>/dev/null || true
 
 if [[ $# -lt 3 ]]; then
     echo "Usage: $0 <iterations> <file_1.yaml> <file_2.yaml> [output_directory]"
-    echo "Example: $0 5 workflow_a.yaml workflow_b.yaml ./benchmark_results"
+    echo "Example: $0 200 workflow_a.yaml workflow_b.yaml ./benchmark_results"
     exit 1
 fi
 
@@ -16,6 +16,15 @@ FILE_3="$4"
 BASE_OUT_DIR="${5:-./benchmark_results}"
 
 export BENCHMARK_MODE=1
+
+# Global iteration counter across all files and test phases
+GLOBAL_ITERATION_COUNT=0
+
+cleanup_workflow_pods() {
+    echo "🧹 [Global Iteration $GLOBAL_ITERATION_COUNT] Cleaning up Argo workflow pods..."
+    kubectl delete pods -n argo -l workflows.argoproj.io/workflow --ignore-not-found=true > /dev/null 2>&1 || true
+    argo delete --all -n argo --yes > /dev/null 2>&1 || true
+}
 
 run_test_suite_for_file() {
     local target_file="$1"
@@ -28,7 +37,7 @@ run_test_suite_for_file() {
     echo "=================================================================="
     echo " Starting Benchmark Suite for File: $target_file"
     echo " Output Directory: $target_dir"
-    echo " Required Iterations: $ITERATIONS"
+    echo " Required Iterations per Phase: $ITERATIONS"
     echo "=================================================================="
 
     # Target Metric Output Files
@@ -37,10 +46,7 @@ run_test_suite_for_file() {
     export WORKFLOW_INACTIVE_LOG="${target_dir}/${base_name}_workflow_inactive_rules_times_ms.txt"
     export APPLY_ACTIVE_LOG="${target_dir}/${base_name}_rule_apply_active_times_ms.txt"
     export APPLY_INACTIVE_LOG="${target_dir}/${base_name}_rule_apply_inactive_times_ms.txt"
-    
-    # SEPARATED RAM LOGS FOR ACTIVE VS INACTIVE
-    export MEMORY_ACTIVE_SERIES_LOG="${target_dir}/${base_name}_ram_usage_active_timeseries.csv"
-    export MEMORY_INACTIVE_SERIES_LOG="${target_dir}/${base_name}_ram_usage_inactive_timeseries.csv"
+    export MEMORY_SERIES_LOG="${target_dir}/${base_name}_ram_usage_timeseries.csv"
 
     get_line_count() {
         local file="$1"
@@ -60,19 +66,26 @@ run_test_suite_for_file() {
             break
         fi
 
-        echo "Running iteration $((current_lines + 1))/$ITERATIONS for Active Rules..."
+        iter_num=$((current_lines + 1))
+        echo "Running iteration ${iter_num}/$ITERATIONS for Active Rules (Global Count: $((GLOBAL_ITERATION_COUNT + 1)))..."
         export WORKFLOW_LOG="$WORKFLOW_ACTIVE_LOG"
         export APPLY_LOG="$APPLY_ACTIVE_LOG"
-        export MEMORY_SERIES_LOG="$MEMORY_ACTIVE_SERIES_LOG"
         
-        ./automate_creation.sh -h -w "$target_file" || {
+        if ./automate_creation.sh -h -w "$target_file"; then
+            GLOBAL_ITERATION_COUNT=$((GLOBAL_ITERATION_COUNT + 1))
+            
+            # Delete pods every 50 global iterations across all files/phases
+            if (( GLOBAL_ITERATION_COUNT % 50 == 0 )); then
+                cleanup_workflow_pods
+            fi
+        else
             echo "Execution failed. Retrying iteration..."
             sleep 3
             continue
-        }
+        fi
     done
 
-    # 2. RUN WORKFLOW WITH RULES DEACTIVATED
+    # 2. RUN WORKFLOW WITH RULES DEACTIVATED (Skips Rule Creation)
     echo "--> Benchmarking Workflow Runtime with Rules DEACTIVATED..."
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_INACTIVE_LOG")
@@ -81,27 +94,36 @@ run_test_suite_for_file() {
             break
         fi
 
-        echo "Running iteration $((current_lines + 1))/$ITERATIONS for Inactive Rules..."
+        iter_num=$((current_lines + 1))
+        echo "Running iteration ${iter_num}/$ITERATIONS for Inactive Rules (Global Count: $((GLOBAL_ITERATION_COUNT + 1)))..."
         export WORKFLOW_LOG="$WORKFLOW_INACTIVE_LOG"
         export APPLY_LOG="$APPLY_INACTIVE_LOG"
-        export MEMORY_SERIES_LOG="$MEMORY_INACTIVE_SERIES_LOG"
         
-        ./automate_creation.sh -h -w -d "$target_file" || {
+        if ./automate_creation.sh -h -w -d "$target_file"; then
+            GLOBAL_ITERATION_COUNT=$((GLOBAL_ITERATION_COUNT + 1))
+            
+            # Delete pods every 50 global iterations across all files/phases
+            if (( GLOBAL_ITERATION_COUNT % 50 == 0 )); then
+                cleanup_workflow_pods
+            fi
+        else
             echo "Execution failed. Retrying iteration..."
             sleep 3
             continue
-        }
+        fi
     done
 
     echo "Finished all benchmark iterations for $target_file."
     echo ""
 }
 
+# Run benchmark suites for both input files
 run_test_suite_for_file "$FILE_1"
 run_test_suite_for_file "$FILE_2"
 run_test_suite_for_file "$FILE_3"
 
 echo "=================================================================="
 echo " All Benchmarks Completed Successfully!"
+echo " Total Global Iterations Executed: $GLOBAL_ITERATION_COUNT"
 echo " Results stored in: $BASE_OUT_DIR"
 echo "=================================================================="
