@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Read the numbers from the text file
-data1 = np.loadtxt("benchmark_workflow_times_no_monitor.txt")
-data2 = np.loadtxt("benchmark_workflow_times_zipslip_monitor.txt")
+data1 = np.loadtxt("./raw_data_vm_updated/benchmark_workflow_times_no_monitor.txt")
+data2 = np.loadtxt("./raw_data_vm_updated/benchmark_workflow_times_zipslip_monitor.txt")
 
 # Create the boxplot
 plt.boxplot([data1, data2], labels=["Monitoring Rules not Applied", "Monitoring Rules Applied"])
