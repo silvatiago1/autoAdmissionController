@@ -1,0 +1,1 @@
+#TODO os dados de ram dos artifacts benignos ficaram lixados por causa daquela cena do openstack, estou a correr isso outra vez, os dados aqui n vão ser os finais
