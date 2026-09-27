@@ -12,7 +12,7 @@ fi
 ITERATIONS="$1"
 FILE_1="$2"
 FILE_2="$3"
-FILE_3="$4"
+FILE_3="${4:-}"
 BASE_OUT_DIR="${5:-./benchmark_results}"
 
 export BENCHMARK_MODE=1
@@ -28,6 +28,10 @@ cleanup_workflow_pods() {
 
 run_test_suite_for_file() {
     local target_file="$1"
+    if [[ -z "$target_file" ]]; then
+        return 0
+    fi
+
     local base_name
     base_name=$(basename "$target_file" | sed 's/\.[^.]*$//')
     
@@ -46,7 +50,10 @@ run_test_suite_for_file() {
     export WORKFLOW_INACTIVE_LOG="${target_dir}/${base_name}_workflow_inactive_rules_times_ms.txt"
     export APPLY_ACTIVE_LOG="${target_dir}/${base_name}_rule_apply_active_times_ms.txt"
     export APPLY_INACTIVE_LOG="${target_dir}/${base_name}_rule_apply_inactive_times_ms.txt"
-    export MEMORY_SERIES_LOG="${target_dir}/${base_name}_ram_usage_timeseries.csv"
+    
+    # Separated RAM Series Log Targets
+    local active_ram_log="${target_dir}/${base_name}_active_ram_usage_timeseries.csv"
+    local inactive_ram_log="${target_dir}/${base_name}_inactive_ram_usage_timeseries.csv"
 
     get_line_count() {
         local file="$1"
@@ -59,6 +66,8 @@ run_test_suite_for_file() {
 
     # 1. RUN CREATION & ACTIVE RULES BENCHMARKS
     echo "--> Benchmarking Rule Creation, Application, and Active Workflow..."
+    export MEMORY_SERIES_LOG="$active_ram_log"
+
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_ACTIVE_LOG")
         if [[ "$current_lines" -ge "$ITERATIONS" ]]; then
@@ -87,6 +96,8 @@ run_test_suite_for_file() {
 
     # 2. RUN WORKFLOW WITH RULES DEACTIVATED (Skips Rule Creation)
     echo "--> Benchmarking Workflow Runtime with Rules DEACTIVATED..."
+    export MEMORY_SERIES_LOG="$inactive_ram_log"
+
     while true; do
         current_lines=$(get_line_count "$WORKFLOW_INACTIVE_LOG")
         if [[ "$current_lines" -ge "$ITERATIONS" ]]; then
@@ -117,10 +128,12 @@ run_test_suite_for_file() {
     echo ""
 }
 
-# Run benchmark suites for both input files
+# Run benchmark suites for input files
 run_test_suite_for_file "$FILE_1"
 run_test_suite_for_file "$FILE_2"
-run_test_suite_for_file "$FILE_3"
+if [[ -n "$FILE_3" ]]; then
+    run_test_suite_for_file "$FILE_3"
+fi
 
 echo "=================================================================="
 echo " All Benchmarks Completed Successfully!"

@@ -7,6 +7,7 @@ SKIP_APPLY=0
 HEADLESS=0
 WAIT_WORKFLOW=0
 DEACTIVATE_RULES=0
+SKIP_HELM=0
 INPUT_FILE=""
 
 creation_elapsed=0
@@ -16,6 +17,10 @@ workflow_elapsed=0
 # Parse optional flags
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --skip-helm)
+            SKIP_HELM=1
+            shift
+            ;;
         --skip-apply|-s)
             SKIP_APPLY=1
             shift
@@ -42,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${INPUT_FILE:-}" ]]; then
-    echo "Usage: $0 [--skip-apply|-s] [--headless|-h] [--wait|-w] [--deactivate-rules|-d] <input_file>"
+    echo "Usage: $0 [--skip-helm] [--skip-apply|-s] [--headless|-h] [--wait|-w] [--deactivate-rules|-d] <input_file>"
     exit 1
 fi
 
@@ -50,7 +55,15 @@ fi
 CREATION_LOG="${CREATION_LOG:-benchmark_rule_creation_times.txt}"
 APPLY_LOG="${APPLY_LOG:-benchmark_rule_apply_times.txt}"
 WORKFLOW_LOG="${WORKFLOW_LOG:-benchmark_workflow_times.txt}"
-MEMORY_SERIES_LOG="${MEMORY_SERIES_LOG:-benchmark_workflow_memory_timeseries.csv}"
+
+# Default RAM series log targets separately if not explicitly exported by parent script
+if [[ -z "${MEMORY_SERIES_LOG:-}" ]]; then
+    if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
+        MEMORY_SERIES_LOG="benchmark_workflow_inactive_ram_timeseries.csv"
+    else
+        MEMORY_SERIES_LOG="benchmark_workflow_active_ram_timeseries.csv"
+    fi
+fi
 
 if [[ ! -f "$MEMORY_SERIES_LOG" ]]; then
     echo "timestamp_epoch_ms,pod_name,memory_bytes,memory_mib" > "$MEMORY_SERIES_LOG"
@@ -60,50 +73,6 @@ fi
 STUCK_SECRET=$(kubectl get secrets -n falco -l "owner=helm,name=falco,status=pending-upgrade" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 if [[ -n "$STUCK_SECRET" ]]; then
     kubectl delete secret "$STUCK_SECRET" -n falco > /dev/null 2>&1 || true
-fi
-
-# ==============================================================================
-# PHASE 1: RULE CREATION (Falco & Prometheus)
-# ==============================================================================
-if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
-    echo "Deactivate flag active: Generating rules (untimed) so they can be applied prior to testing deactivation..."
-    python3 main.py "$INPUT_FILE" > /dev/null 2>&1 || true
-    creation_elapsed=0
-else
-    echo "Running rule generator for Falco and Prometheus..."
-    creation_start=$(date +%s%3N)
-    python3 main.py "$INPUT_FILE"
-    creation_end=$(date +%s%3N)
-    creation_elapsed=$((creation_end - creation_start))
-fi
-
-# Detect Falco rule file
-TARGET_FALCO_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f \( -name "*falco*.yaml" -o -name "*.yaml" \) ! -name "*prometheus*" -print0 2>/dev/null \
-    | xargs -0 ls -t 2>/dev/null \
-    | head -n1 || true)
-
-# Detect Prometheus rule file (e.g., zipslip-prometheus-rules.yaml)
-TARGET_PROM_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*prometheus*.yaml" -print0 2>/dev/null \
-    | xargs -0 ls -t 2>/dev/null \
-    | head -n1 || true)
-
-if [[ -z "$TARGET_FALCO_RULES_FILE" || ! -f "$TARGET_FALCO_RULES_FILE" ]]; then
-    echo "Error: Could not find generated Falco YAML file in ./created_rules"
-    exit 1
-fi
-
-if [[ -z "$TARGET_PROM_RULES_FILE" || ! -f "$TARGET_PROM_RULES_FILE" ]]; then
-    echo "Warning: Could not find generated Prometheus YAML file in ./created_rules"
-fi
-
-# Stop here if --skip-apply is set
-if [[ "$SKIP_APPLY" -eq 1 ]]; then
-    if [[ "${BENCHMARK_MODE:-0}" -eq 1 && "$DEACTIVATE_RULES" -eq 0 ]]; then
-        echo "$creation_elapsed" >> "$CREATION_LOG"
-        echo "Rule Creation Elapsed: $creation_elapsed"
-        echo "Elapsed: $creation_elapsed"
-    fi
-    exit 0
 fi
 
 # ==============================================================================
@@ -158,31 +127,72 @@ apply_active_rules() {
 }
 
 # ==============================================================================
-# PHASE 2: MEASURE RULE APPLY / DEACTIVATE TIME
+# PHASES 1 & 2: RULE CREATION & HELM APPLY (BYPASSED IF --skip-helm IS SET)
 # ==============================================================================
-if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
-    # 1. Untimed pre-application step so rules are active before testing deactivation
-    apply_active_rules
+if [[ "$SKIP_HELM" -eq 0 ]]; then
 
-    # 2. Start timer strictly for deactivating rules
-    apply_start=$(date +%s%3N)
-    deactivate_all_rules
-    apply_end=$(date +%s%3N)
-    
-    apply_elapsed=$((apply_end - apply_start))
+    # --- PHASE 1: RULE CREATION ---
+    if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
+        echo "Deactivate flag active: Generating rules (untimed) so they can be applied prior to testing deactivation..."
+        python3 main.py "$INPUT_FILE" > /dev/null 2>&1 || true
+        creation_elapsed=0
+    else
+        echo "Running rule generator for Falco and Prometheus..."
+        creation_start=$(date +%s%3N)
+        python3 main.py "$INPUT_FILE"
+        creation_end=$(date +%s%3N)
+        creation_elapsed=$((creation_end - creation_start))
+    fi
+
+    # Detect Falco rule file
+    TARGET_FALCO_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f \( -name "*falco*.yaml" -o -name "*.yaml" \) ! -name "*prometheus*" -print0 2>/dev/null \
+        | xargs -0 ls -t 2>/dev/null \
+        | head -n1 || true)
+
+    # Detect Prometheus rule file (e.g., zipslip-prometheus-rules.yaml)
+    TARGET_PROM_RULES_FILE=$(find ./created_rules -maxdepth 1 -type f -name "*prometheus*.yaml" -print0 2>/dev/null \
+        | xargs -0 ls -t 2>/dev/null \
+        | head -n1 || true)
+
+    if [[ -z "$TARGET_FALCO_RULES_FILE" || ! -f "$TARGET_FALCO_RULES_FILE" ]]; then
+        echo "Error: Could not find generated Falco YAML file in ./created_rules"
+        exit 1
+    fi
+
+    if [[ -z "$TARGET_PROM_RULES_FILE" || ! -f "$TARGET_PROM_RULES_FILE" ]]; then
+        echo "Warning: Could not find generated Prometheus YAML file in ./created_rules"
+    fi
+
+    # Stop here if --skip-apply is set
+    if [[ "$SKIP_APPLY" -eq 1 ]]; then
+        if [[ "${BENCHMARK_MODE:-0}" -eq 1 && "$DEACTIVATE_RULES" -eq 0 ]]; then
+            echo "$creation_elapsed" >> "$CREATION_LOG"
+            echo "Rule Creation Elapsed: $creation_elapsed"
+            echo "Elapsed: $creation_elapsed"
+        fi
+        exit 0
+    fi
+
+    # --- PHASE 2: MEASURE RULE APPLY / DEACTIVATE TIME ---
+    if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
+        apply_active_rules
+        apply_start=$(date +%s%3N)
+        deactivate_all_rules
+        apply_end=$(date +%s%3N)
+        apply_elapsed=$((apply_end - apply_start))
+    else
+        deactivate_all_rules
+        apply_start=$(date +%s%3N)
+        apply_active_rules
+        apply_end=$(date +%s%3N)
+        apply_elapsed=$((apply_end - apply_start))
+    fi
+
+    sleep 2
+
 else
-    # 1. Untimed pre-deactivation step to ensure a clean cluster state
-    deactivate_all_rules
-
-    # 2. Start timer strictly for applying new active rules
-    apply_start=$(date +%s%3N)
-    apply_active_rules
-    apply_end=$(date +%s%3N)
-    
-    apply_elapsed=$((apply_end - apply_start))
+    echo "Skipping rule generation and Helm deployment (--skip-helm)..."
 fi
-
-sleep 2
 
 # ==============================================================================
 # PHASE 3: WORKFLOW EXECUTION & SAMPLING (Falco & Prometheus)
@@ -227,11 +237,29 @@ trap 'kill "$MONITOR_PID" 2>/dev/null || true' EXIT
 echo "Submitting Argo workflow..."
 workflow_start=$(date +%s%3N)
 
-SUBMIT_OUTPUT=$(argo submit -n argo "$INPUT_FILE" -o name 2>/dev/null || true)
-if [[ -n "$SUBMIT_OUTPUT" ]]; then
-    argo watch -n argo "$SUBMIT_OUTPUT" > /dev/null 2>&1 || true
+# 1. Capture Argo submission output safely
+RAW_SUBMIT_OUTPUT=$(argo submit -n argo "$INPUT_FILE" -o name 2>&1) || {
+    echo "Error: Failed to submit Argo workflow!"
+    echo "$RAW_SUBMIT_OUTPUT"
+    exit 1
+}
+
+# 2. Extract clean workflow name (removes 'workflow.argoproj.io/' prefix if present)
+WORKFLOW_NAME=$(echo "$RAW_SUBMIT_OUTPUT" | sed 's|^workflow\.argoproj\.io/||' | tr -d '[:space:]')
+
+if [[ -z "$WORKFLOW_NAME" ]]; then
+    echo "Error: Could not parse workflow name from output: $RAW_SUBMIT_OUTPUT"
+    exit 1
+fi
+
+echo "Submitted workflow: $WORKFLOW_NAME"
+echo "Watching execution..."
+
+# 3. Watch workflow completion (respecting --headless flag)
+if [[ "$HEADLESS" -eq 1 ]]; then
+    argo watch -n argo "$WORKFLOW_NAME" > /dev/null 2>&1 || true
 else
-    argo watch -n argo @latest > /dev/null 2>&1 || true
+    argo watch -n argo "$WORKFLOW_NAME"
 fi
 
 workflow_end=$(date +%s%3N)
@@ -241,15 +269,17 @@ workflow_elapsed=$((workflow_end - workflow_start))
 # LOG OUTPUTS FOR BENCHMARKING
 # ==============================================================================
 if [[ "${BENCHMARK_MODE:-0}" -eq 1 ]]; then
-    if [[ "$DEACTIVATE_RULES" -eq 0 ]]; then
+    if [[ "$SKIP_HELM" -eq 0 && "$DEACTIVATE_RULES" -eq 0 ]]; then
         echo "$creation_elapsed" >> "$CREATION_LOG"
         echo "Rule Creation Elapsed: $creation_elapsed"
     fi
     
-    echo "$apply_elapsed" >> "$APPLY_LOG"
+    if [[ "$SKIP_HELM" -eq 0 ]]; then
+        echo "$apply_elapsed" >> "$APPLY_LOG"
+        echo "Rule Apply/Deactivate Elapsed: $apply_elapsed"
+    fi
+
     echo "$workflow_elapsed" >> "$WORKFLOW_LOG"
-    
-    echo "Rule Apply/Deactivate Elapsed: $apply_elapsed"
     echo "Workflow Elapsed: $workflow_elapsed"
     
     total_elapsed=$((creation_elapsed + apply_elapsed + workflow_elapsed))
