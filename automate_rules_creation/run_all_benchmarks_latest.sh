@@ -23,9 +23,9 @@ apply_helm_with_retry() {
     local attempt=1
 
     while [[ $attempt -le $max_retries ]]; do
-        echo "Attempt $attempt/$max_retries: Applying $rule_file..."
+        echo "Attempt $attempt/$max_retries: Applying $rule_file via Helm..."
 
-        # Robustly clear any stuck pending helm release secrets (upgrade, install, rollback)
+        # Robustly clear any stuck pending helm release secrets
         kubectl delete secret -n falco -l "owner=helm,name=falco" --ignore-not-found=true > /dev/null 2>&1 || true
         kubectl get secrets -n falco -o name 2>/dev/null | grep "sh.helm.release.v1.falco" | while read -r sname; do
             status=$(kubectl get "$sname" -n falco -o jsonpath='{.metadata.annotations.status}' 2>/dev/null || true)
@@ -35,10 +35,12 @@ apply_helm_with_retry() {
             fi
         done
 
+        # Added --atomic and --timeout 60s to prevent indefinite hanging
         if helm upgrade --namespace falco falco falcosecurity/falco \
             --set tty=true \
             --set falcoctl.artifact.install.enabled=false \
             --set falcoctl.artifact.follow.enabled=false \
+            --atomic --timeout 60s \
             -f "$rule_file"; then
             echo "Helm upgrade succeeded!"
             return 0
@@ -104,17 +106,26 @@ run_benchmark_suite() {
     if [[ "$benchmark_tag" == "inactive" ]]; then
         echo "--> Deactivating Falco and Prometheus rules ONCE before workflow iterations (Inactive mode)..."
         
-        # Clear any pending helm locks before disabling rules too
         kubectl delete secret -n falco -l "owner=helm,name=falco" --ignore-not-found=true > /dev/null 2>&1 || true
 
         helm upgrade --namespace falco falco falcosecurity/falco \
             --set tty=true \
             --set falcoctl.artifact.install.enabled=false \
             --set falcoctl.artifact.follow.enabled=false \
-            --atomic --timeout 30s \
+            --atomic --timeout 60s \
             -f "disable_rules.yaml" > /dev/null || true
 
-        until kubectl rollout status daemonset/falco -n falco --timeout=60s > /dev/null 2>&1; do
+        # Guarded rollout wait loop with a maximum attempt limit to prevent infinite freezing
+        echo "Waiting for Falco daemonset rollout (inactive mode)..."
+        local rollout_attempt=0
+        local max_rollout_attempts=15
+        while [[ $rollout_attempt -lt $max_rollout_attempts ]]; do
+            if kubectl rollout status daemonset/falco -n falco --timeout=10s > /dev/null 2>&1; then
+                echo "Falco rollout successful."
+                break
+            fi
+            rollout_attempt=$((rollout_attempt + 1))
+            echo "Waiting for rollout... (attempt $rollout_attempt/$max_rollout_attempts)"
             sleep 2
         done
 
@@ -141,7 +152,6 @@ run_benchmark_suite() {
         if ./automate_creation.sh --skip-helm -h -w "$workflow_file"; then
             GLOBAL_ITERATION_COUNT=$((GLOBAL_ITERATION_COUNT + 1))
             
-            # Delete pods every 50 global iterations across all workflows & suites
             if (( GLOBAL_ITERATION_COUNT % 50 == 0 )); then
                 cleanup_workflow_pods
             fi
