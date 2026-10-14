@@ -1,21 +1,24 @@
 import matplotlib.pyplot as plt
 
 # Read values from the two files
-with open("ms_zipslip_creation.txt") as f:
+with open("./old_raw_data_pc/ms_zipslip_creation.txt") as f:
     values1 = [float(line.strip()) for line in f if line.strip()]
 
-with open("benchmark_results_zipslip_whole_process_untill_workflow_submitted.txt") as f:
+with open("./old_raw_data_pc/resource_limited_workflow_rule_apply_active_times_ms.txt") as f:
     values2 = [float(line.strip()) for line in f if line.strip()]
 
+with open("./old_raw_data_pc/resource_limited_workflow_workflow_active_rules_times_ms.txt") as f:
+    values3 = [float(line.strip()) for line in f if line.strip()]
 # Create the graph
 plt.figure(figsize=(12, 6))
 
 plt.plot(values1, label="Time to Create Artifacts")
 plt.plot(values2, label="Time for Rules to be Applied")
+plt.plot(values3, label="Time for Workflow to Run")
 
-plt.xlabel("Data point")
-plt.ylabel("Value")
-plt.title("Value Movement")
+plt.xlabel("Run")
+plt.ylabel("Time(ms)")
+plt.title("")
 plt.legend()
 plt.grid(True, alpha=0.3)
 
