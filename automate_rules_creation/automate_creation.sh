@@ -56,17 +56,28 @@ CREATION_LOG="${CREATION_LOG:-benchmark_rule_creation_times.txt}"
 APPLY_LOG="${APPLY_LOG:-benchmark_rule_apply_times.txt}"
 WORKFLOW_LOG="${WORKFLOW_LOG:-benchmark_workflow_times.txt}"
 
-# Default RAM series log targets separately if not explicitly exported by parent script
+# Default series log targets separately if not explicitly exported by parent script
 if [[ -z "${MEMORY_SERIES_LOG:-}" ]]; then
     if [[ "$DEACTIVATE_RULES" -eq 1 ]]; then
         MEMORY_SERIES_LOG="benchmark_workflow_inactive_ram_timeseries.csv"
+        CPU_SERIES_LOG="benchmark_workflow_inactive_cpu_timeseries.csv"
     else
         MEMORY_SERIES_LOG="benchmark_workflow_active_ram_timeseries.csv"
+        CPU_SERIES_LOG="benchmark_workflow_active_cpu_timeseries.csv"
     fi
+fi
+
+if [[ -z "${CPU_SERIES_LOG:-}" ]]; then
+    CPU_SERIES_LOG="${MEMORY_SERIES_LOG/_ram_/_cpu_}"
+    CPU_SERIES_LOG="${CPU_SERIES_LOG%.csv}_cpu_usage_timeseries.csv"
 fi
 
 if [[ ! -f "$MEMORY_SERIES_LOG" ]]; then
     echo "timestamp_epoch_ms,pod_name,memory_bytes,memory_mib" > "$MEMORY_SERIES_LOG"
+fi
+
+if [[ ! -f "$CPU_SERIES_LOG" ]]; then
+    echo "timestamp_epoch_ms,pod_name,cpu_millicores" > "$CPU_SERIES_LOG"
 fi
 
 # Cleanup stuck helm lock if present
@@ -205,8 +216,19 @@ fi
         if [[ -n "$top_output" ]]; then
             echo "$top_output" | while read -r line; do
                 pod_name=$(echo "$line" | awk '{print $2}')
+                cpu_raw=$(echo "$line" | awk '{print $3}')
                 mem_raw=$(echo "$line" | awk '{print $4}')
                 
+                # Parse CPU (convert to millicores)
+                if [[ "$cpu_raw" == *m ]]; then
+                    cpu_millicores=$(echo "$cpu_raw" | tr -d 'm')
+                elif [[ "$cpu_raw" =~ \. ]]; then
+                    cpu_millicores=$(awk -v val="$cpu_raw" 'BEGIN {print int(val * 1000)}')
+                else
+                    cpu_millicores=$(( ${cpu_raw:-0} * 1000 ))
+                fi
+
+                # Parse Memory (MiB / Bytes)
                 if [[ "$mem_raw" == *Mi ]]; then
                     mem_mib=$(echo "$mem_raw" | tr -d 'Mi')
                     mem_bytes=$((mem_mib * 1048576))
@@ -223,8 +245,13 @@ fi
                     mem_bytes=0
                 fi
 
-                if [[ -n "$pod_name" && "$mem_mib" -gt 0 ]]; then
-                    echo "${now_ms},${pod_name},${mem_bytes},${mem_mib}" >> "$MEMORY_SERIES_LOG"
+                if [[ -n "$pod_name" ]]; then
+                    if [[ "$cpu_millicores" -ge 0 ]]; then
+                        echo "${now_ms},${pod_name},${cpu_millicores}" >> "$CPU_SERIES_LOG"
+                    fi
+                    if [[ "$mem_mib" -gt 0 ]]; then
+                        echo "${now_ms},${pod_name},${mem_bytes},${mem_mib}" >> "$MEMORY_SERIES_LOG"
+                    fi
                 fi
             done
         fi
