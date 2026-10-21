@@ -22,12 +22,20 @@ apply_helm_with_retry() {
     local max_retries=3
     local attempt=1
 
+    echo "🔍 [DEBUG] apply_helm_with_retry invoked for rule file: $rule_file"
+
+    if [[ ! -f "$rule_file" ]]; then
+        echo "❌ [DEBUG ERROR] Rule file does not exist on disk: $rule_file"
+        return 1
+    fi
+
     while [[ $attempt -le $max_retries ]]; do
         echo "Attempt $attempt/$max_retries: Applying $rule_file via Helm..."
 
-        # Robustly clear any stuck pending helm release secrets
+        # Robustly clear any stuck pending helm release secrets safely (avoids pipefail crash)
+        echo "🔍 [DEBUG] Clearing pending helm secrets in namespace 'falco'..."
         kubectl delete secret -n falco -l "owner=helm,name=falco" --ignore-not-found=true > /dev/null 2>&1 || true
-        kubectl get secrets -n falco -o name 2>/dev/null | grep "sh.helm.release.v1.falco" | while read -r sname; do
+        for sname in $(kubectl get secrets -n falco -o name 2>/dev/null | grep "sh.helm.release.v1.falco" || true); do
             status=$(kubectl get "$sname" -n falco -o jsonpath='{.metadata.annotations.status}' 2>/dev/null || true)
             if [[ "$status" == *pending* ]]; then
                 echo "Removing stuck pending Helm secret: $sname (status: $status)"
@@ -35,15 +43,25 @@ apply_helm_with_retry() {
             fi
         done
 
-        # Added --atomic and --timeout 60s to prevent indefinite hanging
-        if helm upgrade --namespace falco falco falcosecurity/falco \
+        echo "🔍 [DEBUG] Executing helm upgrade command now..."
+        
+        set +e
+        helm upgrade --install --namespace falco falco falcosecurity/falco \
             --set tty=true \
             --set falcoctl.artifact.install.enabled=false \
             --set falcoctl.artifact.follow.enabled=false \
-            --atomic --timeout 60s \
-            -f "$rule_file"; then
+            --atomic --timeout 180s \
+            -f "$rule_file"
+        local helm_exit_code=$?
+        set -e
+
+        echo "🔍 [DEBUG] helm upgrade finished with exit code: $helm_exit_code"
+
+        if [[ $helm_exit_code -eq 0 ]]; then
             echo "Helm upgrade succeeded!"
             return 0
+        else
+            echo "❌ [DEBUG] Helm upgrade failed with exit code $helm_exit_code."
         fi
 
         echo "Helm upgrade failed. Cleaning up pending state and attempting rollback..."
@@ -64,8 +82,12 @@ apply_helm_with_retry() {
 apply_prometheus_rules() {
     local prom_file="$1"
     echo "Applying Prometheus rules: $prom_file..."
+    if [[ ! -f "$prom_file" ]]; then
+        echo "❌ [DEBUG ERROR] Prometheus rule file does not exist: $prom_file"
+        return 1
+    fi
     kubectl delete -f "$prom_file" --ignore-not-found=true > /dev/null 2>&1 || true
-    kubectl create -f "$prom_file" > /dev/null
+    kubectl create -f "$prom_file"
 }
 
 get_line_count() {
@@ -107,15 +129,21 @@ run_benchmark_suite() {
         echo "--> Deactivating Falco and Prometheus rules ONCE before workflow iterations (Inactive mode)..."
         
         kubectl delete secret -n falco -l "owner=helm,name=falco" --ignore-not-found=true > /dev/null 2>&1 || true
+        for sname in $(kubectl get secrets -n falco -o name 2>/dev/null | grep "sh.helm.release.v1.falco" || true); do
+            status=$(kubectl get "$sname" -n falco -o jsonpath='{.metadata.annotations.status}' 2>/dev/null || true)
+            if [[ "$status" == *pending* ]]; then
+                echo "Removing stuck pending Helm secret: $sname (status: $status)"
+                kubectl delete "$sname" -n falco > /dev/null 2>&1 || true
+            fi
+        done
 
-        helm upgrade --namespace falco falco falcosecurity/falco \
+        helm upgrade --install --namespace falco falco falcosecurity/falco \
             --set tty=true \
             --set falcoctl.artifact.install.enabled=false \
             --set falcoctl.artifact.follow.enabled=false \
-            --atomic --timeout 60s \
-            -f "disable_rules.yaml" > /dev/null || true
+            --atomic --timeout 180s \
+            -f "disable_rules.yaml" || true
 
-        # Guarded rollout wait loop with a maximum attempt limit to prevent infinite freezing
         echo "Waiting for Falco daemonset rollout (inactive mode)..."
         local rollout_attempt=0
         local max_rollout_attempts=15
@@ -167,6 +195,7 @@ run_benchmark_suite() {
 }
 
 echo "🚀 Starting Full Benchmark Execution Suite..."
+
 
 # ==============================================================================
 # LOOP 1: Inactive Rules
