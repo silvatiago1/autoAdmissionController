@@ -10,21 +10,21 @@ spec:
     rules:
     - alert: ArtifactPassingHelloWorldToFileHighPodCpuUsage
       expr: |
-        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"artifact-passing-.*hello-world-to-file.*"}[3s]) * 10 > 0.03
+        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"artifact-passing-.*hello-world-to-file.*"}[30s]) * 10 > 0.0425
       labels:
         severity: warning
       annotations:
         summary: "High CPU usage"
-        description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is using more than 0.003 CPU 100ms units."
+        description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is using more than 0.0425 CPU 100ms units (85% of limit 5m)."
 
     - alert: ArtifactPassingHelloWorldToFileHighPodMemoryUsage
       expr: |
-        container_memory_working_set_bytes{namespace="argo", pod=~"artifact-passing-.*hello-world-to-file.*"} > 25
+        container_memory_working_set_bytes{namespace="argo", pod=~"artifact-passing-.*hello-world-to-file.*"} > 7130316
       labels:
         severity: warning
       annotations:
         summary: "High Memory usage"
-        description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is exceeding memory limit."
+        description: "Pod matching regex 'artifact-passing-.*hello-world-to-file.*' in namespace argo is exceeding 85% of memory limit (8Mi)."
 
 ---
 apiVersion: monitoring.coreos.com/v1
@@ -39,20 +39,20 @@ spec:
     rules:
     - alert: ArtifactPassingPrintMessageFromFileHighPodCpuUsage
       expr: |
-        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"artifact-passing-.*print-message-from-file.*"}[30s]) * 10 > 0.003
+        rate(container_cpu_usage_seconds_total{namespace="argo", pod=~"artifact-passing-.*print-message-from-file.*"}[30s]) * 10 > 0.0425
       labels:
         severity: warning
       annotations:
         summary: "High CPU usage"
-        description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is using more than 0.003 CPU 100ms units (85% of limit 500m)."
+        description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is using more than 0.0425 CPU 100ms units (85% of limit 5m)."
 
     - alert: ArtifactPassingPrintMessageFromFileHighPodMemoryUsage
       expr: |
-        container_memory_working_set_bytes{namespace="argo", pod=~"artifact-passing-.*print-message-from-file.*"} > 25
+        container_memory_working_set_bytes{namespace="argo", pod=~"artifact-passing-.*print-message-from-file.*"} > 7130316
       labels:
         severity: warning
       annotations:
         summary: "High Memory usage"
-        description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is exceeding 85% of memory limit (256Mi)."
+        description: "Pod matching regex 'artifact-passing-.*print-message-from-file.*' in namespace argo is exceeding 85% of memory limit (8Mi)."
 
 ---

@@ -3,7 +3,7 @@
 set -eu
 set -o pipefail 2>/dev/null || true
 
-ITERATIONS=25
+ITERATIONS=20
 BASE_OUT_DIR="./benchmark_results"
 
 export BENCHMARK_MODE=1
@@ -221,10 +221,10 @@ run_benchmark_suite "inactive" \
 
 
 # ==============================================================================
-# LOOP 2: Active Benign Rules
+# LOOP 2: Active Benign
 # ==============================================================================
 echo "------------------------------------------------------------------"
-echo "Suite 2: Active Benign Rules"
+echo "Suite 2: Active Benign"
 echo "------------------------------------------------------------------"
 
 run_benchmark_suite "active-benign" \
@@ -244,10 +244,10 @@ run_benchmark_suite "active-benign" \
 
 
 # ==============================================================================
-# LOOP 3: Active Anomalous Rules
+# LOOP 3: Active Anomalous
 # ==============================================================================
 echo "------------------------------------------------------------------"
-echo "Suite 3: Active Anomalous Rules"
+echo "Suite 3: Active Anomalous"
 echo "------------------------------------------------------------------"
 
 run_benchmark_suite "active-anomalous" \
@@ -256,14 +256,14 @@ run_benchmark_suite "active-anomalous" \
     "./created_rules/zipslip-prometheus-rules.yaml"
 
 run_benchmark_suite "active-anomalous" \
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/tests/test_argo_yamls/inputs_tests/artifacts.yaml" \
-    "./created_rules/artifact-passing-fake-rules.yaml" \
-    "./created_rules/artifact-passing-fake-prometheus-rules.yaml"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/tests/test_argo_yamls/inputs_tests/artifacts_exploit.yaml" \
+    "./created_rules/artifact-passing-rules.yaml" \
+    "./created_rules/artifact-passing-prometheus-rules.yaml"
 
 run_benchmark_suite "active-anomalous" \
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/vulnerability_examples/podSpecPatch/test_workflow/resource_limited_workflow.yaml" \
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/vulnerability_examples/podSpecPatch/test_workflow/resource_limited_workflow_exploit.yaml" \
     "./created_rules/resource-limited-demo-rules.yaml" \
-    "./created_rules/resource-limited-fake-demo-prometheus-rules.yaml"
+    "./created_rules/resource-limited-demo-prometheus-rules.yaml"
 
 echo "=================================================================="
 echo "✔ All Benchmark Suites Completed Successfully!"
