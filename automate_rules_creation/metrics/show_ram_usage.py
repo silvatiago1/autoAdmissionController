@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Define file paths
-file1_path = "./raw_data_vm_updated_v1/artifacts_anomalous/prometheus_artifacts_ram_usage_timeseries_anomalous.csv"
-file2_path = "./raw_data_vm_updated_v2/artifacts_benign/prometheus_artifacts_active_ram_usage_timeseries_anomalous.csv"
-output_image_path = "./ram_usage_comparison.png"
+file1_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-benign/artifacts_combined/artifacts_ram_prom.csv"
+file2_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_prom.csv"
+output_image_path = "./prom_ram_active_inactive_artifacts.png"
 
 # Read CSV files into DataFrames
 df1 = pd.read_csv(file1_path)
@@ -23,10 +23,10 @@ x2 = np.linspace(0, 100, len(y2))
 plt.figure(figsize=(10, 5))
 
 # File 1 (Prometheus - Blue)
-plt.plot(x1, y1, label="Anomalous Workflow", color="tab:blue")
+plt.plot(x1, y1, label="Active Rules", color="tab:blue")
 
 # File 2 (Alertmanager - Orange)
-plt.plot(x2, y2, label="Benign Workflow", color="orange")
+plt.plot(x2, y2, label="Inactive Rules", color="orange")
 
 plt.xlabel("Sample Sequence Progress (%)")
 plt.ylabel("RAM Usage")

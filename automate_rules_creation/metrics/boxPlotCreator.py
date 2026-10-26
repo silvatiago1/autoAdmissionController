@@ -1,15 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-TRESHOLD = 10270
+TRESHOLD = 20300
 
 # Read the numbers from the text file
 data1 = np.loadtxt(
-    "./raw_data_vm_updated_v1/zipSlip_s3_benign/zipSlip_s3_active_rules_times_ms.txt"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-benign/artifacts_combined/artifacts_ram_prom.csv"
 )
 
 data2 = np.loadtxt(
-    "./raw_data_vm_updated_v1/zipSlip_s3_anomalous/zipSlip_s3_workflow_active_rules_times_ms.txt"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_prom.csv"
 )
 
 # Count outliers (> TRESHOLD)
@@ -25,8 +25,8 @@ data2 = data2[data2 <= TRESHOLD]
 
 # Create the boxplot with outlier counts in labels
 labels = [
-    f"Benign Workflows\n({outliers1} outliers discarded)",
-    f"Anomalous Workflows\n({outliers2} outliers discarded)",
+    f"Benign Workflow\n({outliers1} outliers discarded)",
+    f"Anomalous Workflow\n({outliers2} outliers discarded)",
 ]
 
 plt.boxplot([data1, data2], labels=labels)
@@ -47,6 +47,6 @@ plt.ylabel("Time for the Workflow to Run (ms)")
 plt.title("")
 
 plt.savefig(
-    "anom_benign_zipslip_workflow_run_boxplot.png", dpi=300, bbox_inches="tight"
+    "prom_ram_active_inactive_artifacts.png", dpi=300, bbox_inches="tight"
 )
 plt.show()

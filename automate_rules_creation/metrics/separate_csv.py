@@ -1,9 +1,9 @@
 import csv
 
-input_file = "./raw_data_vm_updated_v1/artifacts_anomalous/resource_limited_workflow_ram_usage_timeseries.csv"
-falco_file = "./raw_data_vm_updated_v1/artifacts_anomalous/falco_resource_ram_usage_timeseries_anomalous.csv"
-prometheus_file = "./raw_data_vm_updated_v1/artifacts_anomalous/prometheus_resource_ram_usage_timeseries_anomalous.csv"
-alertmanager_file = "./raw_data_vm_updated_v1/artifacts_anomalous/alertmanager_resource_ram_usage_timeseries_anomalous.csv"
+input_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_usage_timeseries.csv"
+falco_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_falco.csv"
+prometheus_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_prom.csv"
+alertmanager_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_alert.csv"
 
 with open(input_file, "r", newline="", encoding="utf-8") as infile:
     reader = csv.reader(infile)
