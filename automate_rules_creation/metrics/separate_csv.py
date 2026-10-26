@@ -1,9 +1,9 @@
 import csv
 
-input_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_usage_timeseries.csv"
-falco_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_falco.csv"
-prometheus_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_prom.csv"
-alertmanager_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_alert.csv"
+input_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/zipSlip_s3_combined/zipSlip_s3_cpu_usage_timeseries.csv"
+falco_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/zipSlip_s3_combined/zipslip_cpu_falco.csv"
+prometheus_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/zipSlip_s3_combined/zipslip_cpu_prom.csv"
+alertmanager_file = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/zipSlip_s3_combined/zipslip_cpu_alert.csv"
 
 with open(input_file, "r", newline="", encoding="utf-8") as infile:
     reader = csv.reader(infile)
