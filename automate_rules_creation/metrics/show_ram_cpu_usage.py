@@ -3,17 +3,19 @@ import numpy as np
 import pandas as pd
 
 # Define file paths
-file1_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-anomalous/zipSlip_s3_combined/zipSlip_ram_prom.csv"
-file2_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-benign/zipSlip_s3_benign_combined/zipslip_ram_prom.csv"
-output_image_path = "./prom_ram_anom_benign_zipslip.png"
+file1_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-anomalous/zipSlip_s3_combined/zipSlip_cpu_prom.csv"
+file2_path = "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-benign/zipSlip_s3_benign_combined/zipslip_cpu_prom.csv"
+output_image_path = "./prom_cpu_benign_anom_zipslip.png"
 
 # Read CSV files into DataFrames (header=None since raw rows have no headers)
 df1 = pd.read_csv(file1_path, header=None)
 df2 = pd.read_csv(file2_path, header=None)
 
 # Extract values from the 4th column (index 3) and force numeric type
-y1 = pd.to_numeric(df1.iloc[:, 3], errors='coerce').values
-y2 = pd.to_numeric(df2.iloc[:, 3], errors='coerce').values
+col_idx = 2 if df1.shape[1] == 3 else 3
+
+y1 = pd.to_numeric(df1.iloc[:, col_idx], errors='coerce').values
+y2 = pd.to_numeric(df2.iloc[:, col_idx], errors='coerce').values
 
 # Drop any NaN values that might have resulted from conversion errors
 y1 = y1[~np.isnan(y1)]
