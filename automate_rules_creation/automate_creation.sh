@@ -73,11 +73,11 @@ if [[ -z "${CPU_SERIES_LOG:-}" ]]; then
 fi
 
 if [[ ! -f "$MEMORY_SERIES_LOG" ]]; then
-    echo "timestamp_epoch_ms,pod_name,memory_bytes,memory_mib" > "$MEMORY_SERIES_LOG"
+    echo "timestamp_epoch_ms,process_name,vsz_kb,rss_kb" > "$MEMORY_SERIES_LOG"
 fi
 
 if [[ ! -f "$CPU_SERIES_LOG" ]]; then
-    echo "timestamp_epoch_ms,pod_name,cpu_millicores" > "$CPU_SERIES_LOG"
+    echo "timestamp_epoch_ms,process_name,cpu_percent" > "$CPU_SERIES_LOG"
 fi
 
 # Cleanup stuck helm lock if present
@@ -116,8 +116,8 @@ deactivate_all_rules() {
 
 apply_active_rules() {
     echo "Applying active rules:"
-    echo " - Falco: $TARGET_FALCO_RULES_FILE"
-    echo " - Prometheus: ${TARGET_PROM_RULES_FILE:-None found}"
+    echo "Falco: $TARGET_FALCO_RULES_FILE"
+    echo "Prometheus: ${TARGET_PROM_RULES_FILE:-None found}"
 
     # 1. Apply Falco rules via Helm
     helm upgrade --namespace falco falco falcosecurity/falco \
@@ -206,55 +206,36 @@ else
 fi
 
 # ==============================================================================
-# PHASE 3: WORKFLOW EXECUTION & SAMPLING (Falco & Prometheus)
+# PHASE 3: WORKFLOW EXECUTION & SAMPLING (Falco & Prometheus via ps aux)
 # ==============================================================================
 (
     while true; do
         now_ms=$(date +%s%3N)
-        top_output=$(kubectl top pods -A --no-headers 2>/dev/null | grep -E "falco|prometheus" | grep -v -E "operator|node-exporter|adapter" || true)
         
-        if [[ -n "$top_output" ]]; then
-            echo "$top_output" | while read -r line; do
-                pod_name=$(echo "$line" | awk '{print $2}')
-                cpu_raw=$(echo "$line" | awk '{print $3}')
-                mem_raw=$(echo "$line" | awk '{print $4}')
-                
-                # Parse CPU (convert to millicores)
-                if [[ "$cpu_raw" == *m ]]; then
-                    cpu_millicores=$(echo "$cpu_raw" | tr -d 'm')
-                elif [[ "$cpu_raw" =~ \. ]]; then
-                    cpu_millicores=$(awk -v val="$cpu_raw" 'BEGIN {print int(val * 1000)}')
-                else
-                    cpu_millicores=$(( ${cpu_raw:-0} * 1000 ))
-                fi
-
-                # Parse Memory (MiB / Bytes)
-                if [[ "$mem_raw" == *Mi ]]; then
-                    mem_mib=$(echo "$mem_raw" | tr -d 'Mi')
-                    mem_bytes=$((mem_mib * 1048576))
-                elif [[ "$mem_raw" == *Ki ]]; then
-                    mem_ki=$(echo "$mem_raw" | tr -d 'Ki')
-                    mem_mib=$((mem_ki / 1024))
-                    mem_bytes=$((mem_ki * 1024))
-                elif [[ "$mem_raw" == *Gi ]]; then
-                    mem_gi=$(echo "$mem_raw" | tr -d 'Gi')
-                    mem_mib=$((mem_gi * 1024))
-                    mem_bytes=$((mem_gi * 1073741824))
-                else
-                    mem_mib=0
-                    mem_bytes=0
-                fi
-
-                if [[ -n "$pod_name" ]]; then
-                    if [[ "$cpu_millicores" -ge 0 ]]; then
-                        echo "${now_ms},${pod_name},${cpu_millicores}" >> "$CPU_SERIES_LOG"
-                    fi
-                    if [[ "$mem_mib" -gt 0 ]]; then
-                        echo "${now_ms},${pod_name},${mem_bytes},${mem_mib}" >> "$MEMORY_SERIES_LOG"
-                    fi
-                fi
-            done
+        # 1. Sample Falco process metrics
+        falco_output=$(ps aux | grep falco | grep -v grep | head -n1 | awk '{ print $3 ";" $5 ";" $6; }' || true)
+        if [[ -n "$falco_output" ]]; then
+            IFS=';' read -r cpu_pct vsz rss <<< "$falco_output"
+            if [[ -n "$cpu_pct" ]]; then
+                echo "${now_ms},falco,${cpu_pct}" >> "$CPU_SERIES_LOG"
+            fi
+            if [[ -n "$vsz" && -n "$rss" ]]; then
+                echo "${now_ms},falco,${vsz},${rss}" >> "$MEMORY_SERIES_LOG"
+            fi
         fi
+
+        # 2. Sample Prometheus process metrics (using port 7042)
+        prom_output=$(ps aux | grep 7042 | grep -v grep | head -n1 | awk '{ print $3 ";" $5 ";" $6; }' || true)
+        if [[ -n "$prom_output" ]]; then
+            IFS=';' read -r cpu_pct vsz rss <<< "$prom_output"
+            if [[ -n "$cpu_pct" ]]; then
+                echo "${now_ms},prometheus,${cpu_pct}" >> "$CPU_SERIES_LOG"
+            fi
+            if [[ -n "$vsz" && -n "$rss" ]]; then
+                echo "${now_ms},prometheus,${vsz},${rss}" >> "$MEMORY_SERIES_LOG"
+            fi
+        fi
+
         sleep 3
     done
 ) &
