@@ -5,19 +5,19 @@ TRESHOLD = 20300
 
 # Read the numbers from the text file
 data1 = np.loadtxt(
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/active-benign/artifacts_combined/artifacts_ram_prom.csv"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results/active-benign/artifacts_combined/artifacts_active_rules_times_ms.txt"
 )
 
 data2 = np.loadtxt(
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm/inactive/artifacts_combined/artifacts_ram_prom.csv"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results/inactive/artifacts_combined/artifacts_active_rules_times_ms.txt"
 )
 
 # Count outliers (> TRESHOLD)
 outliers1 = np.sum(data1 > TRESHOLD)
 outliers2 = np.sum(data2 > TRESHOLD)
 
-print(f"Benign Workflow: {outliers1} outliers discarded")
-print(f"Anomalous Workflow: {outliers2} outliers discarded")
+print(f"Active Rules: {outliers1} outliers discarded")
+print(f"Inactive Rules: {outliers2} outliers discarded")
 
 # Discard values greater than TRESHOLD ms
 data1 = data1[data1 <= TRESHOLD]
@@ -29,7 +29,7 @@ labels = [
     f"Anomalous Workflow\n({outliers2} outliers discarded)",
 ]
 
-plt.boxplot([data1, data2], labels=labels)
+plt.boxplot([data1, data2], tick_labels=labels)
 
 # Place the threshold text in the top-right corner using relative axes coordinates
 plt.text(
@@ -47,6 +47,6 @@ plt.ylabel("Time for the Workflow to Run (ms)")
 plt.title("")
 
 plt.savefig(
-    "prom_ram_active_inactive_artifacts.png", dpi=300, bbox_inches="tight"
+    "times_active_inactive_artifacts.png", dpi=300, bbox_inches="tight"
 )
 plt.show()
