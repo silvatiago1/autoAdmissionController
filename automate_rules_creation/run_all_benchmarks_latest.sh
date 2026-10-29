@@ -3,7 +3,7 @@
 set -eu
 set -o pipefail 2>/dev/null || true
 
-ITERATIONS=20
+ITERATIONS=50
 BASE_OUT_DIR="./benchmark_results"
 
 export BENCHMARK_MODE=1

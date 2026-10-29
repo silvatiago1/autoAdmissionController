@@ -225,7 +225,7 @@ fi
         fi
 
         # 2. Sample Prometheus process metrics (using port 7042)
-        prom_output=$(ps aux | grep 7042 | grep -v grep | head -n1 | awk '{ print $3 ";" $5 ";" $6; }' || true)
+        prom_output=$(ps aux | grep monitoring-kube-prometheus-prometheus.default | grep -v grep | head -n1 | awk '{ print $3 ";" $5 ";" $6; }' || true)
         if [[ -n "$prom_output" ]]; then
             IFS=';' read -r cpu_pct vsz rss <<< "$prom_output"
             if [[ -n "$cpu_pct" ]]; then
