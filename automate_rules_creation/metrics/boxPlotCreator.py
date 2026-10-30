@@ -1,15 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-TRESHOLD = 20300
+TRESHOLD = 10300
 
 # Read the numbers from the text file
 data1 = np.loadtxt(
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results/active-benign/artifacts_combined/artifacts_active_rules_times_ms.txt"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm_325/active-benign/resource_limited_workflow_combined/resource_limited_workflow_active_rules_times_ms.txt"
 )
 
 data2 = np.loadtxt(
-    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results/inactive/artifacts_combined/artifacts_active_rules_times_ms.txt"
+    "/home/lemon/Documents/UA/tese/autoAdmissionController/automate_rules_creation/benchmark_results_vm_325/active-anomalous/resource_limited_workflow_combined/resource_limited_workflow_active_rules_times_ms.txt"
 )
 
 # Count outliers (> TRESHOLD)
@@ -47,6 +47,6 @@ plt.ylabel("Time for the Workflow to Run (ms)")
 plt.title("")
 
 plt.savefig(
-    "times_active_inactive_artifacts.png", dpi=300, bbox_inches="tight"
+    "times_benign_anom_resource.png", dpi=300, bbox_inches="tight"
 )
 plt.show()
